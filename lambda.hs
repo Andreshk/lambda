@@ -40,7 +40,8 @@ instance Show Lambda where
           -- Analogously, on multiple consecutive abstractions, f.e. (L (L ...)), gatherLambdas walks
           -- down the tree and in one iteration gathers the names of the successively bound variables.
           -- This results in "lambda[x,y,z]..." instead of "lambda[x]lambda[y]lambda[z]..."
-          gatherLambdas names ctx n (L m) = let newName = name n in gatherLambdas (names ++ [newName]) (newName:ctx) (n+1) m
+          gatherLambdas names ctx n (L m) = let newName = name n
+                                            in gatherLambdas (names ++ [newName]) (newName:ctx) (n+1) m
           gatherLambdas names ctx n t = (names, ctx, n, t)
           -- braceOctoth does the same as octoth, except put braces around complex terms (non-variables)
           braceOctoth ctx n t@(Var _) = octoth ctx n t
@@ -65,21 +66,27 @@ s  = L (L (L (Ap (Ap (Var 2) (Var 0)) (Ap (Var 1) (Var 0))))) -- S
 w  = L (Ap (Var 0) (Var 0))  -- omega 
 om = Ap w w -- the irreducible Omega term
 y  = L (Ap (L (Ap (Var 1) (Ap (Var 0) (Var 0)))) (L (Ap (Var 1) (Ap (Var 0) (Var 0))))) -- fixed-point Y-combinator
-j  = L (Ap (Ap (Var 0) s) k) -- Chris Barker's iota combinator: jj = I, j(j(jj)) = K, j(j(j(jj))) = S
+j  = L (Ap (Ap (Var 0) s) k) -- Chris Barker's iota combinator: jj = I, j(jj) = K*, j(j(jj)) = K, j(j(j(jj))) = S
+        
+-- Increase or decrease all free variables with k, knowing their indices are >= d
+arrow :: Int -> Int -> Lambda -> Lambda
+arrow k d (Var i)  = Var $ if i >= d then i+k else i
+arrow k d (Ap m n) = Ap (arrow k d m) (arrow k d n)
+arrow k d (L m)    = L (arrow k (d+1) m) -- with a new bound variable all other indices increase by 1
+
+-- Bump all free variables with 1, knowing their indices start from 0
+up :: Lambda -> Lambda
+up = arrow 1 0
+
+-- Reduce all free variables by 1, knowing their indices have been bumped to >=1
+down :: Lambda -> Lambda
+down = arrow (-1) 1
 
 -- Nameless lambda substitution
 subst :: Int -> Lambda -> Lambda -> Lambda
 subst i n (Var j)    = if i == j then n else (Var j)
 subst i n (Ap m1 m2) = Ap (subst i n m1) (subst i n m2)
-subst i n (L m)      = L (subst (i+1) (up 1 n) m)
-  where -- Bump all free variables with k
-        up :: Int -> Lambda -> Lambda
-        up k m = up2 k 0 m
-        -- Bump all free variables with k, knowing their indices are >= d
-        up2 :: Int -> Int -> Lambda -> Lambda
-        up2 k d (Var i)  = Var $ if i >= d then i+k else i
-        up2 k d (Ap m n) = Ap (up2 k d m) (up2 k d n)
-        up2 k d (L m)    = L (up2 k (d+1) m)
+subst i n (L m)      = L (subst (i+1) (up n) m)
 
 -- Substitution examples:
 l1, l2 :: Lambda
@@ -89,8 +96,8 @@ l2 = L (Ap (Var 0) (Var 1))                               -- lambda[u]uv
 
 -- Normal reduction strategy, corresponding to lazy evaluation.
 betaStep :: Lambda -> Lambda
-betaStep (Ap (L m) n) = subst 0 n m       -- upper-most,
-betaStep (Ap m n)     = Ap (betaStep m) n -- left-most redex
+betaStep (Ap (L m) n) = down $ subst 0 n m -- upper-most,
+betaStep (Ap m n)     = Ap (betaStep m) n  -- left-most redex
 betaStep (L m)        = L (betaStep m)
 betaStep t            = t -- nothing to reduce, t is a variable
 
