@@ -1,14 +1,19 @@
 {-# LANGUAGE CPP #-} -- C preprocessor for OS detection with ifdef
-import Data.List as L
+import Data.List as Lst
 
 gamma :: [Int] -> [Int]
 gamma l = makeSet $ [0,1,2] ++ [ x+y | x<-l, y<-l, x>y, x<=2*y ]
-  where makeSet = L.sort . L.nub
+  where makeSet = Lst.sort . Lst.nub
 
 data Lambda = Var Int
             | Ap Lambda Lambda
             | L Lambda
   deriving Eq -- alpha-equivalence is syntactic equivalence
+
+-- Short-hand for applying a term on a list of arguments by listing
+-- all terms successively: ap' [x,y,z] = (Ap (Ap x y) z) <=> xyz
+ap' :: [Lambda] -> Lambda
+ap' = Lst.foldl1 Ap
 
 -- Generate a human-friendly variable name from an integer: u,v,w,x,y,z,u1,v1,w1,...
 name :: Int -> String
