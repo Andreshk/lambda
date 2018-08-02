@@ -1,9 +1,10 @@
 {-# LANGUAGE CPP #-} -- C preprocessor for OS detection with ifdef
-import Data.List as Lst (sort,nub,foldl1,intercalate)
+import Data.List (sort,nub,foldl1,intercalate)
+import Data.Functor ((<$>))
 
 gamma :: [Int] -> [Int]
 gamma l = makeSet $ [0,1,2] ++ [ x+y | x<-l, y<-l, x>y, x<=2*y ]
-  where makeSet = Lst.sort . Lst.nub
+  where makeSet = sort . nub
 
 data Lambda = Var Int
             | Ap Lambda Lambda
@@ -13,7 +14,7 @@ data Lambda = Var Int
 -- Short-hand for applying a term on a list of arguments by listing
 -- all terms successively: ap' [x,y,z] = (Ap (Ap x y) z) <=> xyz
 ap' :: [Lambda] -> Lambda
-ap' = Lst.foldl1 Ap
+ap' = foldl1 Ap
 
 -- Generate a human-friendly variable name from an integer: u,v,w,x,y,z,u1,v1,w1,...
 name :: Int -> String
@@ -35,7 +36,7 @@ instance Show Lambda where
     where octoth :: [String] -> Int -> Lambda -> String -- from "octothorpe" (#)
           octoth ctx n (Var i)    = (if i < n then ctx!!i else name i)
           octoth ctx n t@(Ap _ _) = concatMap (braceOctoth ctx n) $ gatherAps t
-          octoth ctx n t          = lambda ++ "[" ++ (Lst.intercalate "," names) ++ "]" ++ octoth ctx' n' t'
+          octoth ctx n t          = lambda ++ "[" ++ (intercalate "," names) ++ "]" ++ octoth ctx' n' t'
             where (names, ctx', n', t') = gatherLambdas [] ctx n t
           -- If there happen to be multiple consecutive applications of a single term,
           -- this makes a list of the term and its arguments for pretty-printing later:
