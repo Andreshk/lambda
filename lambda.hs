@@ -1,5 +1,5 @@
 {-# LANGUAGE CPP #-} -- C preprocessor for OS detection with ifdef
-import Data.List as Lst
+import Data.List as Lst (sort,nub,foldl1,intercalate)
 
 gamma :: [Int] -> [Int]
 gamma l = makeSet $ [0,1,2] ++ [ x+y | x<-l, y<-l, x>y, x<=2*y ]
@@ -35,7 +35,7 @@ instance Show Lambda where
     where octoth :: [String] -> Int -> Lambda -> String -- from "octothorpe" (#)
           octoth ctx n (Var i)    = (if i < n then ctx!!i else name i)
           octoth ctx n t@(Ap _ _) = concatMap (braceOctoth ctx n) $ gatherAps t
-          octoth ctx n t          = lambda ++ "[" ++ (intercalate "," names) ++ "]" ++ octoth ctx' n' t'
+          octoth ctx n t          = lambda ++ "[" ++ (Lst.intercalate "," names) ++ "]" ++ octoth ctx' n' t'
             where (names, ctx', n', t') = gatherLambdas [] ctx n t
           -- If there happen to be multiple consecutive applications of a single term,
           -- this makes a list of the term and its arguments for pretty-printing later:
@@ -100,13 +100,14 @@ l2 = L (Ap (Var 0) (Var 1))                               -- lambda[u]uv
 -- subst 1 l2 l1 -> lambda[x]x(lambda[y]xy(lambda[u]uv)) or something alpha-equivalent to it :)
 
 -- Normal reduction strategy, corresponding to lazy evaluation.
-betaStep :: Lambda -> Lambda
-betaStep (Ap (L m) n) = down $ subst 0 n m -- upper-most,
-betaStep (Ap m n)     = Ap (betaStep m) n  -- left-most redex
-betaStep (L m)        = L (betaStep m)
-betaStep t            = t -- nothing to reduce, t is a variable
+betaStep :: Lambda -> Maybe Lambda
+betaStep (Ap (L m) n) = Just (down $ subst 0 n m) -- upper-most,
+betaStep (Ap m n)     = case betaStep m of Just m' -> Just $ Ap m' n -- left-most redex
+                                           Nothing -> Ap m <$> betaStep n
+betaStep (L m)        = L <$> betaStep m
+betaStep t            = Nothing -- nothing to reduce, t is a variable
 
 -- Reduction to beta-normal form, if such exists
 beta :: Lambda -> Lambda
-beta t = if t == t' then t else beta t'
-  where t' = betaStep t
+beta t = case betaStep t of Nothing -> t
+                            Just t' -> beta t'
