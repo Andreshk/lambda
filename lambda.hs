@@ -2,6 +2,7 @@
 import Data.List (sort,nub,foldl1,intercalate)
 import Data.Functor ((<$>))
 
+-- Gamma operator, whose least fixed-point is the set of the Fibonacci numbers
 gamma :: [Int] -> [Int]
 gamma l = makeSet $ [0,1,2] ++ [ x+y | x<-l, y<-l, x>y, x<=2*y ]
   where makeSet = sort . nub
@@ -20,6 +21,7 @@ ap' = foldl1 Ap
 name :: Int -> String
 name n = ("uvwxyz"!!(rem n 6)) : (if n < 6 then "" else (show (div n 6)))
 
+-- Pretty-print a λ where supported - i.e. everywhere, except Windows
 lambda :: String
 #ifdef mingw32_HOST_OS
 lambda = "lambda"
@@ -45,7 +47,7 @@ instance Show Lambda where
           gatherAps t = [t]
           -- Analogously, on multiple consecutive abstractions, f.e. (L (L ...)), gatherLambdas walks
           -- down the tree and in one iteration gathers the names of the successively bound variables.
-          -- This results in "lambda[x,y,z]..." instead of "lambda[x]lambda[y]lambda[z]..."
+          -- This results in "λ[x,y,z]..." instead of "λ[x]λ[y]λ[z]..."
           gatherLambdas names ctx n (L m) = let newName = name n
                                             in gatherLambdas (names ++ [newName]) (newName:ctx) (n+1) m
           gatherLambdas names ctx n t = (names, ctx, n, t)
@@ -80,13 +82,10 @@ arrow k d (Var i)  = Var $ if i >= d then i+k else i
 arrow k d (Ap m n) = Ap (arrow k d m) (arrow k d n)
 arrow k d (L m)    = L (arrow k (d+1) m) -- with a new bound variable all other indices increase by 1
 
--- Bump all free variables with 1, knowing their indices start from 0
-up :: Lambda -> Lambda
-up = arrow 1 0
-
--- Reduce all free variables by 1, knowing their indices have been bumped to >=1
-down :: Lambda -> Lambda
-down = arrow (-1) 1
+-- Substitution helper functions
+up, down :: Lambda -> Lambda
+up   = arrow 1 0    -- bump all free variables with 1, knowing their indices start from 0
+down = arrow (-1) 1 -- reduce all free variables by 1, knowing their indices have been bumped to >=1
 
 -- Nameless lambda substitution
 subst :: Int -> Lambda -> Lambda -> Lambda
@@ -96,9 +95,9 @@ subst i n (L m)      = L (subst (i+1) (up n) m)
 
 -- Substitution examples:
 l1, l2 :: Lambda
-l1 = L (Ap (Var 0) (L (Ap (Ap (Var 1) (Var 0)) (Var 3)))) -- lambda[x]x(lambda[y]xyz)
-l2 = L (Ap (Var 0) (Var 1))                               -- lambda[u]uv
--- subst 1 l2 l1 -> lambda[x]x(lambda[y]xy(lambda[u]uv)) or something alpha-equivalent to it :)
+l1 = L (Ap (Var 0) (L (ap' [Var 1, Var 0, Var 3]))) -- λ[x]x(λ[y]xyz)
+l2 = L (Ap (Var 0) (Var 1))                               -- λ[u]uv
+-- subst 1 l2 l1 -> λ[x]x(λ[y]xy(λ[u]uv)) or something alpha-equivalent to it :)
 
 -- Normal reduction strategy, corresponding to lazy evaluation.
 betaStep :: Lambda -> Maybe Lambda
@@ -109,6 +108,7 @@ betaStep (L m)        = L <$> betaStep m
 betaStep t            = Nothing -- nothing to reduce, t is a variable
 
 -- Reduction to beta-normal form, if such exists
+-- (otherwise, return the same term, for simplicity)
 beta :: Lambda -> Lambda
 beta t = case betaStep t of Nothing -> t
                             Just t' -> beta t'
