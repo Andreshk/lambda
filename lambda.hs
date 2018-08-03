@@ -102,10 +102,17 @@ betaStep (Ap ((L k m):n:ns)) = Just (sanitize $ Ap (result:ns))
   where result = down $ subst 0 n (sanitize $ L (k-1) m)
 betaStep (Ap ts) = Ap <$> findLeftMost ts
 betaStep (L k t) = L k <$> betaStep t
-betaStep (Var _) = Nothing -- nothing to reduce
+betaStep t       = Nothing -- nothing to reduce, t is a variable
 
 -- Reduction to beta-normal form, if such exists
 -- (otherwise, return the same term, for simplicity)
 beta :: Lambda -> Lambda
 beta t = case betaStep t of Nothing -> t
                             Just t' -> beta t'
+
+-- Check for lambda term structure correctness
+valid :: Lambda -> Bool
+valid (Var i) = i >= 0
+valid (Ap ts) = not (null ts) && not (null $ tail ts) && all valid ts
+valid (L _ (L _ _)) = False
+valid (L k t) = k > 0 && valid t
