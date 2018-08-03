@@ -8,14 +8,9 @@ gamma l = makeSet $ [0,1,2] ++ [ x+y | x<-l, y<-l, x>y, x<=2*y ]
   where makeSet = sort . nub
 
 data Lambda = Var Int
-            | Ap Lambda Lambda
-            | L Lambda
+            | Ap [Lambda]  -- application over many arguments: xyzw instead of (((xy)z)w)
+            | L Int Lambda -- repeated abstraction: λ[u,v,w]... instead of λ[u]λ[v]λ[w]...
   deriving Eq -- alpha-equivalence is syntactic equivalence
-
--- Short-hand for applying a term on a list of arguments by listing
--- all terms successively: ap' [x,y,z] = (Ap (Ap x y) z) <=> xyz
-ap' :: [Lambda] -> Lambda
-ap' = foldl1 Ap
 
 -- Generate a human-friendly variable name from an integer: u,v,w,x,y,z,u1,v1,w1,...
 name :: Int -> String
@@ -36,76 +31,78 @@ lambda = "λ"
 instance Show Lambda where
   show = octoth [] 0
     where octoth :: [String] -> Int -> Lambda -> String -- from "octothorpe" (#)
-          octoth ctx n (Var i)    = (if i < n then ctx!!i else name i)
-          octoth ctx n t@(Ap _ _) = concatMap (braceOctoth ctx n) $ gatherAps t
-          octoth ctx n t          = lambda ++ "[" ++ (intercalate "," names) ++ "]" ++ octoth ctx' n' t'
-            where (names, ctx', n', t') = gatherLambdas [] ctx n t
-          -- If there happen to be multiple consecutive applications of a single term,
-          -- this makes a list of the term and its arguments for pretty-printing later:
-          -- gatherAps (Ap (Ap (Ap x y) z) w) -> [x,y,z,w] -> "xyzw" instead of "(((x)(y))(z))(w)"
-          gatherAps (Ap m n) = gatherAps m ++ [n]
-          gatherAps t = [t]
-          -- Analogously, on multiple consecutive abstractions, f.e. (L (L ...)), gatherLambdas walks
-          -- down the tree and in one iteration gathers the names of the successively bound variables.
-          -- This results in "λ[x,y,z]..." instead of "λ[x]λ[y]λ[z]..."
-          gatherLambdas names ctx n (L m) = let newName = name n
-                                            in gatherLambdas (names ++ [newName]) (newName:ctx) (n+1) m
-          gatherLambdas names ctx n t = (names, ctx, n, t)
+          octoth ctx n (Var i) = (if i < n then ctx!!i else name i)
+          octoth ctx n (Ap ts) = concatMap (braceOctoth ctx n) ts
+          octoth ctx n (L k t) = lambda ++ "[" ++ (intercalate "," names) ++ "]" ++ octoth ctx' (n+k) t
+            where names = map name [n..n+k-1]
+                  ctx' = reverse names ++ ctx
           -- braceOctoth does the same as octoth, except put braces around complex terms (non-variables)
           braceOctoth ctx n t@(Var _) = octoth ctx n t
           braceOctoth ctx n t = "(" ++ octoth ctx n t ++ ")"
 
-
--- Classic, naive reference implementation
-show' :: Lambda -> String
-show' = octoth' []
-  where octoth' :: [String] -> Lambda -> String
-        octoth' ctx (Var i)  = (if i < length ctx then ctx!!i else name i)
-        octoth' ctx (Ap m n) = "(" ++ octoth' ctx m ++ ")(" ++ octoth' ctx n ++ ")"
-        octoth' ctx (L m)    = "lambda" ++ "[" ++ newName ++ "]"++ octoth' (newName:ctx) m -- no λ :(
-          where newName = name $ length ctx
+-- Pretty-print a term to make its structure more easily visible. To-do: DOT
+pretty :: Lambda -> IO ()
+pretty = putStrLn . pretty' 0
+  where pretty' :: Int -> Lambda -> String -- pretty-print at a given indentation level
+        pretty' n (Var i) = replicate n ' ' ++ "Var " ++ (show i) ++ "\n"
+        pretty' n (Ap ts) = replicate n ' ' ++ "Ap\n" ++ concatMap (pretty' (n+2)) ts
+        pretty' n (L k t) = replicate n ' ' ++ "L " ++ (show k) ++ "\n" ++ pretty' (n+2) t
 
 -- Some classic combinators.
 i, k, ks, s, w, om, y, j :: Lambda
-i  = L (Var 0)     -- I
-k  = L (L (Var 1)) -- K
-ks = L (L (Var 0)) -- K*
-s  = L (L (L (Ap (Ap (Var 2) (Var 0)) (Ap (Var 1) (Var 0))))) -- S
-w  = L (Ap (Var 0) (Var 0))  -- omega 
-om = Ap w w -- the irreducible Omega term
-y  = L (Ap (L (Ap (Var 1) (Ap (Var 0) (Var 0)))) (L (Ap (Var 1) (Ap (Var 0) (Var 0))))) -- fixed-point Y-combinator
-j  = L (Ap (Ap (Var 0) s) k) -- Chris Barker's iota combinator: jj = I, j(jj) = K*, j(j(jj)) = K, j(j(j(jj))) = S
+i  = L 1 (Var 0) -- I
+k  = L 2 (Var 1) -- K
+ks = L 2 (Var 0) -- K*
+s  = L 3 (Ap [Var 2, Var 0, Ap [Var 1, Var 0]]) -- S
+w  = L 1 (Ap [Var 0, Var 0])  -- omega 
+om = Ap [w,w] -- the irreducible Omega term
+y  = L 1 (Ap [L 1 (Ap [Var 1, Ap [Var 0, Var 0]]), L 1 (Ap [Var 1, Ap [Var 0, Var 0]])]) -- fixed-point Y-combinator
+j  = L 1 (Ap [Var 0, s, k]) -- Chris Barker's iota combinator: jj = I, j(jj) = K*, j(j(jj)) = K, j(j(j(jj))) = S
         
 -- Increase or decrease all free variables with k, knowing their indices are >= d
 arrow :: Int -> Int -> Lambda -> Lambda
-arrow k d (Var i)  = Var $ if i >= d then i+k else i
-arrow k d (Ap m n) = Ap (arrow k d m) (arrow k d n)
-arrow k d (L m)    = L (arrow k (d+1) m) -- with a new bound variable all other indices increase by 1
+arrow k d (Var i) = Var $ if i >= d then i+k else i
+arrow k d (Ap ts) = Ap $ map (arrow k d) ts
+arrow k d (L n t) = L n $ arrow k (d+n) t -- with each new bound variable all other indices increase by 1
 
 -- Substitution helper functions
-up, down :: Lambda -> Lambda
-up   = arrow 1 0    -- bump all free variables with 1, knowing their indices start from 0
+up :: Int -> Lambda -> Lambda
+up k = arrow k 0    -- bump all free variables with k, knowing their indices start from 0
+down :: Lambda -> Lambda
 down = arrow (-1) 1 -- reduce all free variables by 1, knowing their indices have been bumped to >=1
 
 -- Nameless lambda substitution
 subst :: Int -> Lambda -> Lambda -> Lambda
-subst i n (Var j)    = if i == j then n else (Var j)
-subst i n (Ap m1 m2) = Ap (subst i n m1) (subst i n m2)
-subst i n (L m)      = L (subst (i+1) (up n) m)
+subst i n (Var j) = if i == j then n else (Var j)
+subst i n (Ap ts) = Ap $ map (subst i n) ts
+subst i n (L k t) = L k $ (subst (i+k) (up k n) t)
 
 -- Substitution examples:
 l1, l2 :: Lambda
-l1 = L (Ap (Var 0) (L (ap' [Var 1, Var 0, Var 3]))) -- λ[x]x(λ[y]xyz)
-l2 = L (Ap (Var 0) (Var 1))                               -- λ[u]uv
+l1 = L 1 (Ap [Var 0, L 1 (Ap [Var 1, Var 0, Var 3])]) -- λ[x]x(λ[y]xyz)
+l2 = L 1 (Ap [Var 0, Var 1])                          -- λ[u]uv
 -- subst 1 l2 l1 -> λ[x]x(λ[y]xy(λ[u]uv)) or something alpha-equivalent to it :)
+
+-- Reductions may simplify the more complex terms
+sanitize :: Lambda -> Lambda
+sanitize (Ap [n]) = n -- un-apply, if 0 arguments
+sanitize (L 0 m) = m  -- un-lambda, if no variables bound
+sanitize t = t
+
+-- Traverse the list in depth, looking to reduce only the
+-- left-most regex, and return Nothing if no regex is found.
+findLeftMost :: [Lambda] -> Maybe [Lambda]
+findLeftMost [] = Nothing
+findLeftMost (n:ns) = case betaStep n of Just n' -> Just (n':ns)
+                                         Nothing -> (n:) <$> findLeftMost ns
 
 -- Normal reduction strategy, corresponding to lazy evaluation.
 betaStep :: Lambda -> Maybe Lambda
-betaStep (Ap (L m) n) = Just (down $ subst 0 n m) -- upper-most,
-betaStep (Ap m n)     = case betaStep m of Just m' -> Just $ Ap m' n -- left-most redex
-                                           Nothing -> Ap m <$> betaStep n
-betaStep (L m)        = L <$> betaStep m
-betaStep t            = Nothing -- nothing to reduce, t is a variable
+betaStep (Ap ((L k m):n:ns)) = Just (sanitize $ Ap (result:ns))
+  where result = down $ subst 0 n (sanitize $ L (k-1) m)
+betaStep (Ap ns) = Ap <$> findLeftMost ns
+betaStep (L k t) = L k <$> betaStep t
+betaStep (Var _) = Nothing -- nothing to reduce
 
 -- Reduction to beta-normal form, if such exists
 -- (otherwise, return the same term, for simplicity)
