@@ -85,22 +85,22 @@ l2 = L 1 (Ap [Var 0, Var 1])                          -- λ[u]uv
 
 -- Reductions may simplify the more complex terms
 sanitize :: Lambda -> Lambda
-sanitize (Ap [n]) = n -- un-apply, if 0 arguments
-sanitize (L 0 m) = m  -- un-lambda, if no variables bound
+sanitize (Ap [t]) = t -- un-apply, if 0 arguments
+sanitize (L 0 t) = t  -- un-lambda, if no variables bound
 sanitize t = t
 
 -- Traverse the list in depth, looking to reduce only the
 -- left-most regex, and return Nothing if no regex is found.
 findLeftMost :: [Lambda] -> Maybe [Lambda]
 findLeftMost [] = Nothing
-findLeftMost (n:ns) = case betaStep n of Just n' -> Just (n':ns)
-                                         Nothing -> (n:) <$> findLeftMost ns
+findLeftMost (t:ts) = case betaStep t of Just t' -> Just (t':ts)
+                                         Nothing -> (t:) <$> findLeftMost ts
 
 -- Normal reduction strategy, corresponding to lazy evaluation.
 betaStep :: Lambda -> Maybe Lambda
 betaStep (Ap ((L k m):n:ns)) = Just (sanitize $ Ap (result:ns))
   where result = down $ subst 0 n (sanitize $ L (k-1) m)
-betaStep (Ap ns) = Ap <$> findLeftMost ns
+betaStep (Ap ts) = Ap <$> findLeftMost ts
 betaStep (L k t) = L k <$> betaStep t
 betaStep (Var _) = Nothing -- nothing to reduce
 
