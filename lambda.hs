@@ -1,5 +1,5 @@
 {-# LANGUAGE CPP #-} -- C preprocessor for OS detection with ifdef
-import Data.List (sort,nub,foldl1,intercalate)
+import Data.List (sort,nub,intercalate)
 import Data.Functor ((<$>))
 
 -- Gamma operator, whose least fixed-point is the set of the Fibonacci numbers
@@ -41,7 +41,7 @@ instance Show Lambda where
           braceOctoth ctx n t = "(" ++ octoth ctx n t ++ ")"
 
 -- Pretty-print a term to make its structure more easily visible. To-do: DOT
-pretty :: Lambda -> IO ()
+pretty :: Lambda -> IO () -- disclaimer: not actually pretty
 pretty = putStrLn . pretty' 0
   where pretty' :: Int -> Lambda -> String -- pretty-print at a given indentation level
         pretty' n (Var i) = replicate n ' ' ++ "Var " ++ (show i) ++ "\n"
@@ -91,16 +91,16 @@ sanitize t = t
 
 -- Traverse the list in depth, looking to reduce only the
 -- left-most regex, and return Nothing if no regex is found.
-findLeftMost :: [Lambda] -> Maybe [Lambda]
-findLeftMost [] = Nothing
-findLeftMost (t:ts) = case betaStep t of Just t' -> Just (t':ts)
-                                         Nothing -> (t:) <$> findLeftMost ts
+reduceLeftMost :: [Lambda] -> Maybe [Lambda]
+reduceLeftMost [] = Nothing
+reduceLeftMost (t:ts) = case betaStep t of Just t' -> Just (t':ts)
+                                           Nothing -> (t:) <$> reduceLeftMost ts
 
 -- Normal reduction strategy, corresponding to lazy evaluation.
 betaStep :: Lambda -> Maybe Lambda
 betaStep (Ap ((L k m):n:ns)) = Just (sanitize $ Ap (result:ns))
   where result = down $ subst 0 n (sanitize $ L (k-1) m)
-betaStep (Ap ts) = Ap <$> findLeftMost ts
+betaStep (Ap ts) = Ap <$> reduceLeftMost ts
 betaStep (L k t) = L k <$> betaStep t
 betaStep t       = Nothing -- nothing to reduce, t is a variable
 
@@ -108,7 +108,7 @@ betaStep t       = Nothing -- nothing to reduce, t is a variable
 -- (otherwise, return the same term, for simplicity)
 beta :: Lambda -> Lambda
 beta t = case betaStep t of Nothing -> t
-                            Just t' -> beta t'
+                            Just t' -> if t == t' then t else beta t'
 
 -- Check for lambda term structure correctness
 valid :: Lambda -> Bool
@@ -116,3 +116,16 @@ valid (Var i) = i >= 0
 valid (Ap ts) = not (null ts) && not (null $ tail ts) && all valid ts
 valid (L _ (L _ _)) = False
 valid (L k t) = k > 0 && valid t
+
+-- List every step of the beta reduction process
+betaSteps :: Lambda -> [Lambda]
+betaSteps t
+  | res == Nothing = [t]
+  | t == t'        = [t]
+  | otherwise      = t : betaSteps t'
+  where res = betaStep t
+        (Just t') = res -- lazily evaluated
+
+-- If all we need is to display the steps
+betaSteps_ :: Lambda -> IO ()
+betaSteps_ = mapM_ print . betaSteps
