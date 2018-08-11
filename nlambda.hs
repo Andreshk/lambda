@@ -85,7 +85,7 @@ ps :: String -> Maybe NLambda
 ps str = (psTerm str >>= psEof)
   where psEof (t, rest) = if null rest then Just t else Nothing
 
--- bemolle (♭): Named to nameless conversion
+-- bemolle (♭): Named to nameless conversion. Invariant: n == length ctx
 bemolle :: NLambda -> Lambda
 bemolle = bemolle' [] 0
   where bemolle' ctx n (NVar v)  = Var $ find v ctx
