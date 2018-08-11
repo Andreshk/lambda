@@ -17,10 +17,9 @@ psChar c (c':cs) = if c == c' then Just cs else Nothing
 psName :: String -> Maybe (String, String)
 psName "" = Nothing
 psName (c:cs)
-  | c `elem` "uvwxyz" = Just (name, rest)
-  | otherwise = Nothing
+  | c `elem` "uvwxyz" = Just (c:num, rest)
+  | otherwise         = Nothing
   where (num, rest) = span (`elem` ['0'..'9']) cs
-        name = c:num
 
 -- Parse a single variable
 psVar :: String -> Maybe (NTerm, String)
@@ -66,8 +65,8 @@ psList :: String -> Maybe ([NTerm], String)
 psList str = do
   (fst, rest) <- psSimple str -- again, at least one
   case (psList rest)
-    of Nothing    -> return ([fst], rest)
-       Just (l,r) -> return (fst:l, r)
+    of Just (ts, rest) -> return (fst:ts, rest)
+       Nothing         -> return ([fst], rest)
 
 -- A lambda term is just a list of "simpler" terms. However, a list with
 -- one term is just that term, otherwise it's application of multiple terms
