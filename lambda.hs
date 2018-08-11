@@ -1,4 +1,5 @@
 {-# LANGUAGE CPP #-} -- C preprocessor for OS detection with ifdef
+module Lambda where
 import Data.List (sort,nub,intercalate)
 import Data.Functor ((<$>))
 
@@ -29,16 +30,16 @@ lambda = "λ"
 -- and push that name to the front of the context to preserve the deBruijn indices
 -- of all variables. Invariant: n == length ctx.
 instance Show Lambda where
-  show = octoth [] 0
-    where octoth :: [String] -> Int -> Lambda -> String -- from "octothorpe" (#)
-          octoth ctx n (Var i) = (if i < n then ctx!!i else name i)
-          octoth ctx n (Ap ts) = concatMap (braceOctoth ctx n) ts
-          octoth ctx n (L k t) = lambda ++ "[" ++ (intercalate "," names) ++ "]" ++ octoth ctx' (n+k) t
+  show = diese [] 0
+    where diese :: [String] -> Int -> Lambda -> String -- from "diese" in music (♯)
+          diese ctx n (Var i) = (if i < n then ctx!!i else name i)
+          diese ctx n (Ap ts) = concatMap (braceDiese ctx n) ts
+          diese ctx n (L k t) = lambda ++ "[" ++ (intercalate "," names) ++ "]" ++ diese ctx' (n+k) t
             where names = map name [n..n+k-1]
                   ctx' = reverse names ++ ctx
-          -- braceOctoth does the same as octoth, except put braces around complex terms (non-variables)
-          braceOctoth ctx n t@(Var _) = octoth ctx n t
-          braceOctoth ctx n t = "(" ++ octoth ctx n t ++ ")"
+          -- braceDiese does the same as diese, except put braces around complex terms (non-variables)
+          braceDiese ctx n t@(Var _) = diese ctx n t
+          braceDiese ctx n t = "(" ++ diese ctx n t ++ ")"
 
 -- Pretty-print a term to make its structure more easily visible. To-do: DOT
 pretty :: Lambda -> IO () -- disclaimer: not actually pretty

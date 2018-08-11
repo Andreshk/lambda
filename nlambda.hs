@@ -1,11 +1,13 @@
 {-# LANGUAGE TupleSections #-}
-module NLambda (NTerm(..), ps) where
+module NLambda (NLambda(..), ps, bemolle) where
 import Control.Applicative ((<|>))
+import Data.List (elemIndex)
+import Lambda (Lambda(..), name)
 
 -- Named lambda term
-data NTerm = NVar String       -- a variable with a name
-           | NAp [NTerm]       -- application of multiple terms
-           | NL [String] NTerm -- repeated abstraction
+data NLambda = NVar String         -- a variable with a name
+             | NAp [NLambda]       -- application of multiple terms
+             | NL [String] NLambda -- repeated abstraction
   deriving Show -- temporary
 
 -- Parsing (and discarding) a single character
@@ -22,7 +24,7 @@ psName (c:cs)
   where (num, rest) = span (`elem` ['0'..'9']) cs
 
 -- Parse a single variable
-psVar :: String -> Maybe (NTerm, String)
+psVar :: String -> Maybe (NLambda, String)
 psVar str = do
   (name, rest) <- psName str
   return (NVar name, rest)
@@ -40,7 +42,7 @@ psArgs str = do
        Nothing          -> return ([n], rest)
 
 -- Parse a "lambda[..].." expression in pieces
-psLam :: String -> Maybe (NTerm, String)
+psLam :: String -> Maybe (NLambda, String)
 psLam str = do
   (names, rest) <- (psLambda str >>= (psChar '[') >>= psArgs)
   (t, rest) <- ((psChar ']' rest) >>= psTerm)
@@ -49,19 +51,19 @@ psLam str = do
         compress ns t = NL ns t
 
 -- Brackets can be placed around each term, to indicate order of operations
-psBr :: String -> Maybe (NTerm, String)
+psBr :: String -> Maybe (NLambda, String)
 psBr str = do
   (t, rest) <- ((psChar '(' str) >>= psTerm)
   (t,) <$> psChar ')' rest
 
 -- A "simple" term is either a variable, a lambda, or something in brackets
-psSimple :: String -> Maybe (NTerm, String)
+psSimple :: String -> Maybe (NLambda, String)
 psSimple str = (psVar str)
            <|> (psLam str)
            <|> (psBr str)
 
 -- Simple terms next to each other form a list
-psList :: String -> Maybe ([NTerm], String)
+psList :: String -> Maybe ([NLambda], String)
 psList str = do
   (fst, rest) <- psSimple str -- again, at least one
   case (psList rest)
@@ -70,7 +72,7 @@ psList str = do
 
 -- A lambda term is just a list of "simpler" terms. However, a list with
 -- one term is just that term, otherwise it's application of multiple terms
-psTerm :: String -> Maybe (NTerm, String)
+psTerm :: String -> Maybe (NLambda, String)
 psTerm str = do
   (ts, rest) <- psList str
   return (simplify ts, rest)
@@ -79,6 +81,16 @@ psTerm str = do
         simplify ts = NAp ts
 
 -- Parse a string, consisting only of a single lambda term
-ps :: String -> Maybe NTerm
+ps :: String -> Maybe NLambda
 ps str = (psTerm str >>= psEof)
   where psEof (t, rest) = if null rest then Just t else Nothing
+
+-- bemolle (♭): Named to nameless conversion
+bemolle :: NLambda -> Lambda
+bemolle = bemolle' [] 0
+  where bemolle' ctx n (NVar v)  = Var $ find v ctx
+        bemolle' ctx n (NAp ts)  = Ap $ map (bemolle' ctx n) ts
+        bemolle' ctx n (NL ns t) = L k (bemolle' ctx' (n+k) t)
+          where k = length ns
+                ctx' = (reverse ns) ++ ctx
+        find n ns = let (Just idx) = elemIndex n ns in idx
