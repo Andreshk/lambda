@@ -26,7 +26,7 @@ psName (c:cs)
 psVar :: String -> Maybe (NTerm, String)
 psVar str = do
   (name, rest) <- psName str
-  return $ (NVar name, rest)
+  return (NVar name, rest)
 
 -- Parse and discard the literal "lambda"
 psLambda :: String -> Maybe String
@@ -45,7 +45,9 @@ psLam :: String -> Maybe (NTerm, String)
 psLam str = do
   (names, rest) <- (psLambda str >>= (psChar '[') >>= psArgs)
   (t, rest) <- ((psChar ']' rest) >>= psTerm)
-  return (NL names t, rest)
+  return (compress names t, rest)
+  where compress ns (NL ns' t') = NL (ns++ns') t' -- take care of "lambda[..]lambda[..].."
+        compress ns t = NL ns t
 
 -- Brackets can be placed around each term, to indicate order of operations
 psBr :: String -> Maybe (NTerm, String)
@@ -73,8 +75,9 @@ psTerm :: String -> Maybe (NTerm, String)
 psTerm str = do
   (ts, rest) <- psList str
   return (simplify ts, rest)
-  where simplify [t] = t      -- a single term
-        simplify ts  = NAp ts -- application of multiple terms
+  where simplify [t] = t -- a single term
+        simplify ((NAp ts):ts') = NAp (ts++ts') -- compressed application of multiple terms
+        simplify ts = NAp ts
 
 -- Parse a string, consisting only of a single lambda term
 ps :: String -> Maybe NTerm
