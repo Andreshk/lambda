@@ -3,11 +3,6 @@ module Lambda where
 import Data.List (sort,nub,intercalate)
 import Data.Functor ((<$>))
 
--- Gamma operator, whose least fixed-point is the set of the Fibonacci numbers
-gamma :: [Int] -> [Int]
-gamma l = makeSet $ [0,1,2] ++ [ x+y | x<-l, y<-l, x>y, x<=2*y ]
-  where makeSet = sort . nub
-
 data Lambda = Var Int
             | Ap [Lambda]  -- application over many arguments: xyzw instead of (((xy)z)w)
             | L Int Lambda -- repeated abstraction: λ[u,v,w]... instead of λ[u]λ[v]λ[w]...

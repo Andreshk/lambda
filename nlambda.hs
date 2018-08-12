@@ -2,7 +2,7 @@
 module NLambda (NLambda(..), ps, bemolle) where
 import Control.Applicative ((<|>))
 import Data.List (elemIndex)
-import Lambda (Lambda(..), name)
+import Lambda (Lambda(..))
 
 -- Named lambda term
 data NLambda = NVar String         -- a variable with a name
