@@ -1,7 +1,8 @@
 {-# LANGUAGE TupleSections #-}
-module NLambda (NLambda(..), ps, bemolle) where
+module NLambda (NLambda(..), ps, fv, bemolle) where
 import Control.Applicative ((<|>))
-import Data.List (elemIndex)
+import Data.Maybe (fromJust)
+import Data.List (elemIndex, sort, nub, (\\))
 import Lambda (Lambda(..))
 
 -- Named lambda term
@@ -85,12 +86,20 @@ ps :: String -> Maybe NLambda
 ps str = (psTerm str >>= psEof)
   where psEof (t, rest) = if null rest then Just t else Nothing
 
--- bemolle (♭): Named to nameless conversion. Invariant: n == length ctx
+-- Free variables of a term, sorted for convenience.
+-- There may be a more efficient implementation.
+fv :: NLambda -> [String]
+fv (NVar n)  = [n]
+fv (NAp ts)  = sort . nub $ concatMap fv ts
+fv (NL ns t) = (fv t) \\ ns
+
+-- bemolle (♭): Named to nameless conversion.
+-- The initial context is the set of the free variables in the term.
 bemolle :: NLambda -> Lambda
-bemolle = bemolle' [] 0
-  where bemolle' ctx n (NVar v)  = Var $ find v ctx
-        bemolle' ctx n (NAp ts)  = Ap $ map (bemolle' ctx n) ts
-        bemolle' ctx n (NL ns t) = L k (bemolle' ctx' (n+k) t)
+bemolle t = bemolle' (fv t) t
+  where bemolle' ctx (NVar n)  = Var $ find n ctx
+        bemolle' ctx (NAp ts)  = Ap $ map (bemolle' ctx) ts
+        bemolle' ctx (NL ns t) = L k (bemolle' ctx' t)
           where k = length ns
                 ctx' = (reverse ns) ++ ctx
-        find n ns = let (Just idx) = elemIndex n ns in idx
+        find n ns = fromJust $ elemIndex n ns
