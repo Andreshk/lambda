@@ -6,8 +6,8 @@
 -- Haskell. For a very readable presentation of this algorithm
 -- and possible variations and extensions read also Heeren[2002].
 
-import qualified Data.HashMap.Lazy as Map -- used for representing contexts (also sometimes called environments)
-import qualified Data.HashSet      as Set -- used for representing sets of type variables, etc
+import qualified Data.IntMap.Lazy as Map -- used for representing contexts (also sometimes called environments)
+import qualified Data.IntSet      as Set -- used for representing sets of type variables, etc.
 import Control.Monad.Except (ExceptT, runExceptT, throwError, catchError)
 import Control.Monad.State (StateT, runStateT, put, get)
 import Data.List (intercalate)
@@ -16,6 +16,7 @@ data Expr = EVar Int
           | EApp Expr Expr
           | EAbs Int Expr
 
+infixr :->
 data Type = TVar Int
           | Type :-> Type
           deriving Eq
@@ -27,7 +28,7 @@ data Scheme = Scheme [Int] Type
 -- Determining the free type variables of a type and applying a substituion.
 -- Implemented in a type class, because they'll also be needed for contexts, etc.
 class Types a where
-  ftv   :: a -> Set.HashSet Int
+  ftv   :: a -> Set.IntSet
   apply :: Subst -> a -> a
 
 instance Types Type where
@@ -51,7 +52,7 @@ instance Types a => Types [a] where
   ftv l   = foldr Set.union Set.empty (map ftv l)
 
 -- Substitutions are finite mappings from type variables to types.
-newtype Subst = Subst (Map.HashMap Int Type)
+newtype Subst = Subst (Map.IntMap Type)
 
 nullSubst :: Subst
 nullSubst = Subst Map.empty
@@ -61,10 +62,19 @@ composeSubst (Subst s1) (Subst s2) = Subst $ (apply (Subst s1) <$> s2) `Map.unio
 
 -- Contexts (or type environments), called $\Gamma$ in the text,
 -- are mappings from term variables to their respective type schemes.
-newtype Context = Context (Map.HashMap Int Scheme)
+-- Maps the shifted DeBruijn index of a bound variable to its scheme
+-- (see the comment below).
+newtype Context = Context (Map.IntMap Scheme)
 
 nullCtx :: Context
 nullCtx = Context Map.empty
+
+-- Each new bound variable is added with a fake negative DeBruijn
+-- index, instead of increasing the DeBruijn indices of all other
+-- variables by 1. On lookup the index searched is shifted down,
+-- in order to simulate containing a range of [0..n-1].
+ctxInsert :: Int
+ctxInsert = -1
 
 ctxLookup :: Int -> Context -> Maybe Scheme
 ctxLookup i (Context g) = Map.lookup (i + 1 - (Map.size g)) g
@@ -72,12 +82,6 @@ ctxLookup i (Context g) = Map.lookup (i + 1 - (Map.size g)) g
 instance Types Context where
   ftv (Context g)     = ftv (Map.elems g)
   apply s (Context g) = Context (apply s <$> g)
-
--- Abstracts a type over all type variables, which are
--- free in the type, but not free in the given context.
-generalize :: Context -> Type -> Scheme
-generalize g t = Scheme vars t
-  where vars = Set.toList ((ftv t) `Set.difference` (ftv g))
 
 -- Several operations, for example type scheme instantiation, require
 -- fresh names for newly introduced type variables. This is implemented
@@ -112,21 +116,22 @@ instantiate (Scheme vars t) =
      return $ apply (Subst s) t
 
 -- This is the unification function for types, returning the most
--- general unifier for two given types. A unifier is a substitution
--- S such that (apply S t1) == (apply S t2). The function varBind
--- attempts to bind a type variable to a type and return that binding
--- as a subsitution, but avoids binding a variable to itself and
--- performs the occurs check, responsible for circularity type errors.
+-- general unifier for two given types. A unifier of t1 and t2 is
+-- a substitution S such that (apply S t1) == (apply S t2). The
+-- function varBind attempts to bind a type variable to a type
+-- and return that binding as a subsitution, but avoids binding
+-- a variable to itself and performs the occurs check, responsible
+-- for circularity type errors.
 mgu :: Type -> Type -> TI Subst
 mgu (l :-> r) (l' :-> r') =
   do s1 <- mgu l l'
      s2 <- mgu (apply s1 r) (apply s1 r')
      return (s1 `composeSubst` s2)
-mgu (TVar u) t = varBind u t
-mgu t (TVar u) = varBind u t
+mgu (TVar u) t = varBind (TVar u) t
+mgu t (TVar u) = varBind (TVar u) t
 
-varBind :: Int -> Type -> TI Subst
-varBind u t
+varBind :: Type -> Type -> TI Subst
+varBind (TVar u) t
   | t == TVar u          = return nullSubst
   | u `Set.member` ftv t = throwError $ "  occurs check fails: " ++ typename u ++ " vs. " ++ show t
   | otherwise            = return $ Subst (Map.singleton u t)
@@ -150,8 +155,7 @@ ti g (EApp e1 e2) =
   `catchError`
   (\err -> throwError $ err ++ "\n  in " ++ showCtx g (EApp e1 e2))
 ti (Context g) (EAbs k e) =
-  do -- Negative numbers are inserted as fake DeBruijn indices, instead of increasing all other indices
-     let n = Map.size g
+  do let n = Map.size g
          indices = map negate [n..n+k-1]
      tvs <- mapM (const newTypeVar) indices
      let g' = Context (foldr (\(idx,tv) -> Map.insert idx (Scheme [] tv)) g (zip indices tvs))
