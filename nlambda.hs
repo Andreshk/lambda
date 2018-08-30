@@ -5,10 +5,13 @@ import Data.Maybe (fromJust)
 import Data.List (elemIndex, sort, nub, (\\))
 import Lambda (Lambda(..))
 
+newtype Name = Name String deriving (Eq, Ord)
+instance Show Name where show (Name n) = show n
+
 -- Named lambda term
-data NLambda = NVar String         -- a variable with a name
+data NLambda = NVar Name         -- a variable with a name
              | NAp [NLambda]       -- application of multiple terms
-             | NL [String] NLambda -- repeated abstraction
+             | NL [Name] NLambda -- repeated abstraction
   deriving Show -- temporary
 
 -- Parsing (and discarding) a single character
@@ -17,10 +20,10 @@ psChar _ "" = Nothing
 psChar c (c':cs) = if c == c' then Just cs else Nothing
 
 -- A name can only be one of x,y,z,u,v,w, perhaps followed by a number
-psName :: String -> Maybe (String, String)
+psName :: String -> Maybe (Name, String)
 psName "" = Nothing
 psName (c:cs)
-  | c `elem` "uvwxyz" = Just (c:num, rest)
+  | c `elem` "uvwxyz" = Just (Name (c:num), rest)
   | otherwise         = Nothing
   where (num, rest) = span (`elem` ['0'..'9']) cs
 
@@ -35,7 +38,7 @@ psLambda :: String -> Maybe String
 psLambda str = if "lambda" == take 6 str then Just $ drop 6 str else Nothing
 
 -- Parse a list of comma-separated names
-psArgs :: String -> Maybe ([String], String)
+psArgs :: String -> Maybe ([Name], String)
 psArgs str = do
   (n, rest) <- psName str -- at least one name
   case ((psChar ',' rest) >>= psArgs)
@@ -88,7 +91,7 @@ ps str = (psTerm str >>= psEof)
 
 -- Free variables of a term, sorted for convenience.
 -- There may be a more efficient implementation.
-fv :: NLambda -> [String]
+fv :: NLambda -> [Name]
 fv (NVar n)  = [n]
 fv (NAp ts)  = sort . nub $ concatMap fv ts
 fv (NL ns t) = (fv t) \\ ns
@@ -97,8 +100,8 @@ fv (NL ns t) = (fv t) \\ ns
 -- The initial context is the set of the free variables in the term.
 bemolle :: NLambda -> Lambda
 bemolle t = bemolle' (fv t) t
-  where bemolle' ctx (NVar n)  = Var $ find n ctx
-        bemolle' ctx (NAp ts)  = Ap $ map (bemolle' ctx) ts
+  where bemolle' ctx (NVar n)  = Var (find n ctx)
+        bemolle' ctx (NAp ts)  = Ap (bemolle' ctx <$> ts)
         bemolle' ctx (NL ns t) = L k (bemolle' ctx' t)
           where k = length ns
                 ctx' = (reverse ns) ++ ctx
