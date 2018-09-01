@@ -41,8 +41,8 @@ instance Types Type where
   ftv (t1 :-> t2) = ftv t1 `Set.union` ftv t2
 
   apply (Subst s) (T n) = case Map.lookup n s of
-                               Nothing -> T n
-                               Just t  -> t
+                            Nothing -> T n
+                            Just t  -> t
   apply s (t1 :-> t2) = (apply s t1) :-> (apply s t2)
 
 -- A substitution only replaces free type variables, so the
@@ -136,13 +136,13 @@ mgu :: Type -> Type -> TI Subst
 mgu (l :-> r) (l' :-> r') =
   do s1 <- mgu l l'
      s2 <- mgu (apply s1 r) (apply s1 r')
-     return (s1 `composeSubst` s2)
+     return (s2 `composeSubst` s1)
 mgu (T u) t = varBind (T u) t
 mgu t (T u) = varBind (T u) t
 
 varBind :: Type -> Type -> TI Subst
 varBind (T u) t
-  | t == T u          = return nullSubst
+  | t == T u             = return nullSubst
   | u `Set.member` ftv t = throwError $ "  occurs check fails: " ++ typename u ++ " vs. " ++ show t
   | otherwise            = return $ Subst (Map.singleton u t)
 
@@ -191,10 +191,11 @@ e3 = L 2 (Var 0)
 e4 = L 1 (Ap [Var 0, e0, e2])
 e5 = L 3 (Ap [Var 0, Var 4])
 e6 = L 2 (Ap [Var 0, Var 1, Ap [Var 0, Var 0], Var 0, Var 1])
+e7 = L 2 (Ap [Var 0, Ap [Var 1, Ap [Var 1, Var 0]]])
 
 -- Main Program
 main :: IO ()
-main = mapM_ infer [e0, e1, e2, e3, e4, e5, e6]
+main = mapM_ infer [e0, e1, e2, e3, e4, e5, e6, e7]
 
 -- Pretty-printing
 showCtx' :: Context -> Lambda -> String
