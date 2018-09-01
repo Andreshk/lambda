@@ -1,4 +1,4 @@
-module W where
+module W (Type(..), order, infer, testInfer) where
 -- Algorithm W Step by Step
 -- Original implementation: Martin Grabmueller
 --   (https://github.com/wh5a/Algorithm-W-Step-By-Step)
@@ -194,8 +194,8 @@ e6 = L 2 (Ap [Var 0, Var 1, Ap [Var 0, Var 0], Var 0, Var 1])
 e7 = L 2 (Ap [Var 0, Ap [Var 1, Ap [Var 1, Var 0]]])
 
 -- Main Program
-main :: IO ()
-main = mapM_ infer [e0, e1, e2, e3, e4, e5, e6, e7]
+testInfer :: IO ()
+testInfer = mapM_ infer [e0, e1, e2, e3, e4, e5, e6, e7]
 
 -- Pretty-printing
 showCtx' :: Context -> Lambda -> String
