@@ -1,3 +1,4 @@
+module W where
 -- Algorithm W Step by Step, by Martin Grabmueller
 
 -- Complete implementation of the classic algorithm W for
@@ -11,10 +12,7 @@ import qualified Data.IntSet      as Set -- used for representing sets of type v
 import Control.Monad.Except (ExceptT, runExceptT, throwError, catchError)
 import Control.Monad.State (StateT, runStateT, put, get)
 import Data.List (intercalate)
-
-data Expr = EVar Int
-          | EApp [Expr]
-          | EAbs Int Expr
+import Lambda (Lambda(..)) -- the compressed lambda terms
 
 infixr :->
 data Type = TVar Int
@@ -80,7 +78,6 @@ ctxInsert k (Context g) =
      tvs <- mapM (const newTypeVar) indices
      let g' = Context $ foldr (\(idx,t) -> Map.insert idx (Scheme [] t)) g (zip indices tvs)
      return (g', tvs)
-     
 
 ctxLookup :: Int -> Context -> Maybe Scheme
 ctxLookup i (Context g) = Map.lookup (i + 1 - (Map.size g)) g
@@ -146,48 +143,48 @@ varBind (TVar u) t
 -- for all free variables of the expressions. The returned substitution
 -- records the type constraints imposed on type variables by the
 -- expression, and the returned type is the type of the expression.
-ti :: Context -> Expr -> TI (Subst, Type)
-ti g (EVar i) =
+ti :: Context -> Lambda -> TI (Subst, Type)
+ti g (Var i) =
   case ctxLookup i g of
     Nothing    -> throwError $ "  unbound variable: " ++ show (name i)
     Just sigma -> do t <- instantiate sigma
                      return (nullSubst, t)
-ti g (EApp [e]) = ti g e
-ti g (EApp es) =
+ti g (Ap [t]) = ti g t
+ti g (Ap ts) =
   do tv <- newTypeVar
-     (s1, t1) <- ti g (EApp $ init es)
-     (s2, t2) <- ti (apply s1 g) (last es)
+     (s1, t1) <- ti g (Ap $ init ts)
+     (s2, t2) <- ti (apply s1 g) (last ts)
      s3 <- mgu (apply s2 t1) (t2 :-> tv)
      return (s3 `composeSubst` s2 `composeSubst` s1, apply s3 tv)
   `catchError`
-  (\err -> throwError $ err ++ "\n  in " ++ showCtx g (EApp es))
-ti g (EAbs k e) =
+  (\err -> throwError $ err ++ "\n  in " ++ showCtx g (Ap ts))
+ti g (L k t) =
   do (g', tvs) <- ctxInsert k g
-     (s1, t1) <- ti g' e
+     (s1, t1) <- ti g' t
      return (s1, foldr ((:->) . apply s1) t1 tvs)
   `catchError`
-  (\err -> throwError $ err ++ "\n  in " ++ showCtx g (EAbs k e))
+  (\err -> throwError $ err ++ "\n  in " ++ showCtx g (L k t))
 
 -- This simple test function tries to infer the type for the given
 -- expression. If successful, it prints the expression together with its
 -- type, otherwise, it prints the error message. The helper function
 -- calls ti and applies the returned substitution to the returned type.
-infer :: Expr -> IO ()
-infer e =
-  do (res, _) <- runTI $ (return . uncurry apply) =<< ti nullCtx e
+infer :: Lambda -> IO ()
+infer t =
+  do (res, _) <- runTI $ (return . uncurry apply) =<< ti nullCtx t
      case res of
-       Left err -> putStrLn $ show e ++ "\n" ++ err ++ "\n"
-       Right t  -> putStrLn $ show e ++ " :: " ++ show t ++ "\n"
+       Left err -> putStrLn $ show t ++ "\n" ++ err ++ "\n"
+       Right ty -> putStrLn $ show t ++ " :: " ++ show ty ++ "\n"
 
 -- Tests
-e0, e1, e2, e3, e4, e5, e6 :: Expr
-e0 = EAbs 3 $ EApp [EVar 2, EVar 0, EApp [EVar 1, EVar 0]]
-e1 = EAbs 1 $ EVar 0
-e2 = EAbs 2 $ EVar 1
-e3 = EAbs 2 $ EVar 0
-e4 = EAbs 1 $ EApp [EVar 0, e0, e2]
-e5 = EAbs 3 $ EApp [EVar 0, EVar 4]
-e6 = EAbs 1 $ EApp [EVar 0, EAbs 1 $ EApp [EVar 0, EVar 0]]
+e0, e1, e2, e3, e4, e5, e6 :: Lambda
+e0 = L 3 $ Ap [Var 2, Var 0, Ap [Var 1, Var 0]]
+e1 = L 1 $ Var 0
+e2 = L 2 $ Var 1
+e3 = L 2 $ Var 0
+e4 = L 1 $ Ap [Var 0, e0, e2]
+e5 = L 3 $ Ap [Var 0, Var 4]
+e6 = L 2 $ Ap [Var 0, Var 1, Ap [Var 0, Var 0], Var 0, Var 1]
 
 -- Main Program
 main :: IO ()
@@ -196,17 +193,14 @@ main = mapM_ infer [e0, e1, e2, e3, e4, e5, e6]
 -- Pretty-printing
 name n = ("uvwxyz"!!(rem n 6)) : (if n < 6 then "" else (show (div n 6)))
 
-instance Show Expr where
-  show = showCtx nullCtx
-
 showCtx (Context g) e = show' ctx n e
   where (ctx,n) = let n = Map.size g in (map name $ reverse [0..n-1], n)
-        show' ctx n (EVar i)   = (if i < n then ctx!!i else name i)
-        show' ctx n (EApp es)  = concatMap (showBr ctx n) es
-        show' ctx n (EAbs k e) = "lambda[" ++ intercalate "," names ++ "]" ++ show' ctx' (n+k) e
+        show' ctx n (Var i)   = (if i < n then ctx!!i else name i)
+        show' ctx n (Ap es)  = concatMap (showBr ctx n) es
+        show' ctx n (L k e) = "lambda[" ++ intercalate "," names ++ "]" ++ show' ctx' (n+k) e
           where names = map name [n..n+k-1]
                 ctx' = reverse names ++ ctx
-        showBr ctx n e@(EVar _) = show' ctx n e
+        showBr ctx n e@(Var _) = show' ctx n e
         showBr ctx n e = "(" ++ show' ctx n e ++ ")"
 
 instance Show Type where
