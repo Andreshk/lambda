@@ -150,24 +150,25 @@ varBind (T u) t
 -- for all free variables of the expressions. The returned substitution
 -- records the type constraints imposed on type variables by the
 -- expression, and the returned type is the type of the expression.
-ti :: Context -> Lambda -> TI (Subst, Type)
-ti g (Var i) =
+-- The third argument is used to silence the error reporting in some cases.
+ti :: Context -> Lambda -> Bool -> TI (Subst, Type)
+ti g (Var i) _ =
   case ctxLookup i g of
     Nothing    -> throwError $ "  unbound variable: " ++ show (name i)
     Just sigma -> do t <- instantiate sigma
                      return (nullSubst, t)
-ti g (Ap [t]) = ti g t
-ti g (Ap ts) =
+ti g (Ap [t]) _ = ti g t True
+ti g (Ap ts) b =
   do tv <- newTypeVar
-     (s1, t1) <- ti g (Ap $ init ts)
-     (s2, t2) <- ti (apply s1 g) (last ts)
+     (s1, t1) <- ti g (Ap $ init ts) False
+     (s2, t2) <- ti (apply s1 g) (last ts) True
      s3 <- mgu (apply s2 t1) (t2 :-> tv)
      return (s3 `composeSubst` s2 `composeSubst` s1, apply s3 tv)
   `catchError`
-  (\err -> throwError $ err ++ "\n  in " ++ showCtx' g (Ap ts))
-ti g (L k t) =
+  (\err -> throwError $ if b then err ++ "\n  in " ++ showCtx' g (Ap ts) else err)
+ti g (L k t) _ =
   do (g', tvs) <- ctxInsert k g
-     (s1, t1) <- ti g' t
+     (s1, t1) <- ti g' t True
      return (s1, foldr ((:->) . apply s1) t1 tvs)
   `catchError`
   (\err -> throwError $ err ++ "\n  in " ++ showCtx' g (L k t))
@@ -177,7 +178,7 @@ ti g (L k t) =
 -- type, otherwise, it prints the error message. The helper function
 -- calls ti and applies the returned substitution to the returned type.
 infer :: Lambda -> IO ()
-infer t = printRes =<< (runTI $ (return . uncurry apply) =<< ti nullCtx t)
+infer t = printRes =<< (runTI $ (return . uncurry apply) =<< ti nullCtx t True)
   where printRes (Left err, _) = putStrLn $ show t ++ "\n" ++ err ++ "\n"
         printRes (Right ty, _) = putStrLn $ show t ++ " :: " ++ show ty ++ "\n"
 
@@ -203,10 +204,10 @@ showCtx' (Context g) = showCtx names n
 -- The -> operator is right-associative, so a->(b->c) is the same as
 -- a->b->c and is printed this way, whereas (a->b)->c is different
 instance Show Type where
-    show (T i) = typename i
-    show (t :-> t1) = show' t ++ " -> " ++ show t1             -- no brackets by default...
-      where show' (t1 :-> t2) = "(" ++ show (t1 :-> t2) ++ ")" -- ...unless the left arg is a function
-            show' t = show t
+  show (T i) = typename i
+  show (t :-> t1) = show' t ++ " -> " ++ show t1             -- no brackets by default...
+    where show' (t1 :-> t2) = "(" ++ show (t1 :-> t2) ++ ")" -- ...unless the left arg is a function
+          show' t = show t
 
 instance Show Scheme where
   show (Scheme vars t) = "forall " ++ intercalate "," (map show vars) ++ ". " ++ show t
