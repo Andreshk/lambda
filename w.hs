@@ -13,7 +13,7 @@ import Control.Monad.State (StateT, runStateT, put, get)
 import Data.List (intercalate)
 
 data Expr = EVar Int
-          | EApp Expr Expr
+          | EApp [Expr]
           | EAbs Int Expr
 
 infixr :->
@@ -152,14 +152,15 @@ ti g (EVar i) =
     Nothing    -> throwError $ "  unbound variable: " ++ show (name i)
     Just sigma -> do t <- instantiate sigma
                      return (nullSubst, t)
-ti g (EApp e1 e2) =
+ti g (EApp [e]) = ti g e
+ti g (EApp es) =
   do tv <- newTypeVar
-     (s1, t1) <- ti g e1
-     (s2, t2) <- ti (apply s1 g) e2
+     (s1, t1) <- ti g (EApp $ init es)
+     (s2, t2) <- ti (apply s1 g) (last es)
      s3 <- mgu (apply s2 t1) (t2 :-> tv)
      return (s3 `composeSubst` s2 `composeSubst` s1, apply s3 tv)
   `catchError`
-  (\err -> throwError $ err ++ "\n  in " ++ showCtx g (EApp e1 e2))
+  (\err -> throwError $ err ++ "\n  in " ++ showCtx g (EApp es))
 ti g (EAbs k e) =
   do (g', tvs) <- ctxInsert k g
      (s1, t1) <- ti g' e
@@ -180,13 +181,13 @@ infer e =
 
 -- Tests
 e0, e1, e2, e3, e4, e5, e6 :: Expr
-e0 = EAbs 3 $ EApp (EApp (EVar 2) (EVar 0)) (EApp (EVar 1) (EVar 0))
+e0 = EAbs 3 $ EApp [EVar 2, EVar 0, EApp [EVar 1, EVar 0]]
 e1 = EAbs 1 $ EVar 0
 e2 = EAbs 2 $ EVar 1
 e3 = EAbs 2 $ EVar 0
-e4 = EAbs 1 $ EApp (EApp (EVar 0) e0) e2
-e5 = EAbs 3 $ EApp (EVar 0) (EVar 4)
-e6 = EAbs 1 $ EApp (EVar 0) (EAbs 1 $ EApp (EVar 0) (EVar 0))
+e4 = EAbs 1 $ EApp [EVar 0, e0, e2]
+e5 = EAbs 3 $ EApp [EVar 0, EVar 4]
+e6 = EAbs 1 $ EApp [EVar 0, EAbs 1 $ EApp [EVar 0, EVar 0]]
 
 -- Main Program
 main :: IO ()
@@ -200,9 +201,9 @@ instance Show Expr where
 
 showCtx (Context g) e = show' ctx n e
   where (ctx,n) = let n = Map.size g in (map name $ reverse [0..n-1], n)
-        show' ctx n (EVar i)     = (if i < n then ctx!!i else name i)
-        show' ctx n (EApp e1 e2) = showBr ctx n e1 ++ showBr ctx n e2
-        show' ctx n (EAbs k e)   = "lambda[" ++ intercalate "," names ++ "]" ++ show' ctx' (n+k) e
+        show' ctx n (EVar i)   = (if i < n then ctx!!i else name i)
+        show' ctx n (EApp es)  = concatMap (showBr ctx n) es
+        show' ctx n (EAbs k e) = "lambda[" ++ intercalate "," names ++ "]" ++ show' ctx' (n+k) e
           where names = map name [n..n+k-1]
                 ctx' = reverse names ++ ctx
         showBr ctx n e@(EVar _) = show' ctx n e
