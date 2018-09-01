@@ -1,5 +1,7 @@
 module W where
--- Algorithm W Step by Step, by Martin Grabmueller
+-- Algorithm W Step by Step
+-- Original implementation: Martin Grabmueller
+--   (https://github.com/wh5a/Algorithm-W-Step-By-Step)
 
 -- Complete implementation of the classic algorithm W for
 -- Hindley-Milner polymorphic type inference in Haskell, used
@@ -12,12 +14,17 @@ import qualified Data.IntSet      as Set -- used for representing sets of type v
 import Control.Monad.Except (ExceptT, runExceptT, throwError, catchError)
 import Control.Monad.State (StateT, runStateT, put, get)
 import Data.List (intercalate)
-import Lambda (Lambda(..)) -- the compressed lambda terms
+import Lambda (Lambda(..), name, showCtx) -- the compressed lambda terms
 
 infixr :->
-data Type = TVar Int
+data Type = T Int
           | Type :-> Type
           deriving Eq
+
+-- Order of a type, as in "higher-order function"
+order :: Type -> Int
+order (T _) = 0
+order (t1 :-> t2) = max (order t1 + 1) (order t2)
 
 -- A type scheme "forall a_1,...,a_n.t" is a type in which a number of 
 -- polymorphic type variables are bound to a universal quantifier.
@@ -30,11 +37,11 @@ class Types a where
   apply :: Subst -> a -> a
 
 instance Types Type where
-  ftv (TVar n)    = Set.singleton n
+  ftv (T n)    = Set.singleton n
   ftv (t1 :-> t2) = ftv t1 `Set.union` ftv t2
 
-  apply (Subst s) (TVar n) = case Map.lookup n s of
-                               Nothing -> TVar n
+  apply (Subst s) (T n) = case Map.lookup n s of
+                               Nothing -> T n
                                Just t  -> t
   apply s (t1 :-> t2) = (apply s t1) :-> (apply s t2)
 
@@ -104,7 +111,7 @@ newTypeVar :: TI Type
 newTypeVar =
   do (TIState c) <- get
      put $ TIState (c + 1)
-     return $ TVar c
+     return $ T c
 
 -- Generates human-friendly names for type variables
 typename :: Int -> String
@@ -130,12 +137,12 @@ mgu (l :-> r) (l' :-> r') =
   do s1 <- mgu l l'
      s2 <- mgu (apply s1 r) (apply s1 r')
      return (s1 `composeSubst` s2)
-mgu (TVar u) t = varBind (TVar u) t
-mgu t (TVar u) = varBind (TVar u) t
+mgu (T u) t = varBind (T u) t
+mgu t (T u) = varBind (T u) t
 
 varBind :: Type -> Type -> TI Subst
-varBind (TVar u) t
-  | t == TVar u          = return nullSubst
+varBind (T u) t
+  | t == T u          = return nullSubst
   | u `Set.member` ftv t = throwError $ "  occurs check fails: " ++ typename u ++ " vs. " ++ show t
   | otherwise            = return $ Subst (Map.singleton u t)
 
@@ -157,57 +164,49 @@ ti g (Ap ts) =
      s3 <- mgu (apply s2 t1) (t2 :-> tv)
      return (s3 `composeSubst` s2 `composeSubst` s1, apply s3 tv)
   `catchError`
-  (\err -> throwError $ err ++ "\n  in " ++ showCtx g (Ap ts))
+  (\err -> throwError $ err ++ "\n  in " ++ showCtx' g (Ap ts))
 ti g (L k t) =
   do (g', tvs) <- ctxInsert k g
      (s1, t1) <- ti g' t
      return (s1, foldr ((:->) . apply s1) t1 tvs)
   `catchError`
-  (\err -> throwError $ err ++ "\n  in " ++ showCtx g (L k t))
+  (\err -> throwError $ err ++ "\n  in " ++ showCtx' g (L k t))
 
 -- This simple test function tries to infer the type for the given
 -- expression. If successful, it prints the expression together with its
 -- type, otherwise, it prints the error message. The helper function
 -- calls ti and applies the returned substitution to the returned type.
 infer :: Lambda -> IO ()
-infer t =
-  do (res, _) <- runTI $ (return . uncurry apply) =<< ti nullCtx t
-     case res of
-       Left err -> putStrLn $ show t ++ "\n" ++ err ++ "\n"
-       Right ty -> putStrLn $ show t ++ " :: " ++ show ty ++ "\n"
+infer t = printRes =<< (runTI $ (return . uncurry apply) =<< ti nullCtx t)
+  where printRes (Left err, _) = putStrLn $ show t ++ "\n" ++ err ++ "\n"
+        printRes (Right ty, _) = putStrLn $ show t ++ " :: " ++ show ty ++ "\n"
 
 -- Tests
 e0, e1, e2, e3, e4, e5, e6 :: Lambda
-e0 = L 3 $ Ap [Var 2, Var 0, Ap [Var 1, Var 0]]
-e1 = L 1 $ Var 0
-e2 = L 2 $ Var 1
-e3 = L 2 $ Var 0
-e4 = L 1 $ Ap [Var 0, e0, e2]
-e5 = L 3 $ Ap [Var 0, Var 4]
-e6 = L 2 $ Ap [Var 0, Var 1, Ap [Var 0, Var 0], Var 0, Var 1]
+e0 = L 3 (Ap [Var 2, Var 0, Ap [Var 1, Var 0]])
+e1 = L 1 (Var 0)
+e2 = L 2 (Var 1)
+e3 = L 2 (Var 0)
+e4 = L 1 (Ap [Var 0, e0, e2])
+e5 = L 3 (Ap [Var 0, Var 4])
+e6 = L 2 (Ap [Var 0, Var 1, Ap [Var 0, Var 0], Var 0, Var 1])
 
 -- Main Program
 main :: IO ()
 main = mapM_ infer [e0, e1, e2, e3, e4, e5, e6]
 
 -- Pretty-printing
-name n = ("uvwxyz"!!(rem n 6)) : (if n < 6 then "" else (show (div n 6)))
+showCtx' :: Context -> Lambda -> String
+showCtx' (Context g) = showCtx names n
+  where (names, n) = let n = Map.size g in (name <$> reverse [0..n-1], n)
 
-showCtx (Context g) e = show' ctx n e
-  where (ctx,n) = let n = Map.size g in (map name $ reverse [0..n-1], n)
-        show' ctx n (Var i)   = (if i < n then ctx!!i else name i)
-        show' ctx n (Ap es)  = concatMap (showBr ctx n) es
-        show' ctx n (L k e) = "lambda[" ++ intercalate "," names ++ "]" ++ show' ctx' (n+k) e
-          where names = map name [n..n+k-1]
-                ctx' = reverse names ++ ctx
-        showBr ctx n e@(Var _) = show' ctx n e
-        showBr ctx n e = "(" ++ show' ctx n e ++ ")"
-
+-- The -> operator is right-associative, so a->(b->c) is the same as
+-- a->b->c and is printed this way, whereas (a->b)->c is different
 instance Show Type where
-  show (TVar n)  = typename n
-  show (t :-> s) = show' t ++ " -> " ++ show s
-    where show' (t :-> s) = "(" ++ show (t :-> s) ++ ")"
-          show' t = show t
+    show (T i) = typename i
+    show (t :-> t1) = show' t ++ " -> " ++ show t1             -- no brackets by default...
+      where show' (t1 :-> t2) = "(" ++ show (t1 :-> t2) ++ ")" -- ...unless the left arg is a function
+            show' t = show t
 
 instance Show Scheme where
   show (Scheme vars t) = "forall " ++ intercalate "," (map show vars) ++ ". " ++ show t

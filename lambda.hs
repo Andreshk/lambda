@@ -1,7 +1,6 @@
 {-# LANGUAGE CPP #-} -- C preprocessor for OS detection with ifdef
 module Lambda where
 import Data.List (sort,nub,intercalate)
-import Data.Functor ((<$>))
 
 data Lambda = Var Int
             | Ap [Lambda]  -- application over many arguments: xyzw instead of (((xy)z)w)
@@ -25,16 +24,17 @@ lambda = "λ"
 -- and push that name to the front of the context to preserve the deBruijn indices
 -- of all variables. Invariant: n == length ctx.
 instance Show Lambda where
-  show = diese [] 0
-    where diese :: [String] -> Int -> Lambda -> String -- from "diese" in music (♯)
-          diese ctx n (Var i) = (if i < n then ctx!!i else name i)
-          diese ctx n (Ap ts) = concatMap (braceDiese ctx n) ts
-          diese ctx n (L k t) = lambda ++ "[" ++ (intercalate "," names) ++ "]" ++ diese ctx' (n+k) t
-            where names = map name [n..n+k-1]
-                  ctx' = reverse names ++ ctx
-          -- braceDiese does the same as diese, except put braces around complex terms (non-variables)
-          braceDiese ctx n t@(Var _) = diese ctx n t
-          braceDiese ctx n t = "(" ++ diese ctx n t ++ ")"
+  show = showCtx [] 0
+
+-- A function also used during type inference, not to be called directly
+showCtx :: [String] -> Int -> Lambda -> String
+showCtx ctx n (Var i) = (if i < n then ctx!!i else name i)
+showCtx ctx n (Ap ts) = concatMap (showBr ctx n) ts
+  where showBr ctx n t@(Var _) = showCtx ctx n t -- does the same as showCtx, except put braces around complex terms (non-variables)
+        showBr ctx n t = "(" ++ showCtx ctx n t ++ ")"
+showCtx ctx n (L k t) = lambda ++ "[" ++ (intercalate "," names) ++ "]" ++ showCtx ctx' (n+k) t
+  where names = map name [n..n+k-1]
+        ctx' = reverse names ++ ctx
 
 -- Pretty-print a term to make its structure more easily visible. To-do: DOT
 pretty :: Lambda -> IO () -- disclaimer: not actually pretty
