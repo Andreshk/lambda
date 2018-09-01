@@ -73,8 +73,14 @@ nullCtx = Context Map.empty
 -- index, instead of increasing the DeBruijn indices of all other
 -- variables by 1. On lookup the index searched is shifted down,
 -- in order to simulate containing a range of [0..n-1].
-ctxInsert :: Int
-ctxInsert = -1
+ctxInsert :: Int -> Context -> TI (Context, [Type])
+ctxInsert k (Context g) =
+  do let n = Map.size g
+         indices = map negate [n..n+k-1]
+     tvs <- mapM (const newTypeVar) indices
+     let g' = Context $ foldr (\(idx,t) -> Map.insert idx (Scheme [] t)) g (zip indices tvs)
+     return (g', tvs)
+     
 
 ctxLookup :: Int -> Context -> Maybe Scheme
 ctxLookup i (Context g) = Map.lookup (i + 1 - (Map.size g)) g
@@ -154,15 +160,12 @@ ti g (EApp e1 e2) =
      return (s3 `composeSubst` s2 `composeSubst` s1, apply s3 tv)
   `catchError`
   (\err -> throwError $ err ++ "\n  in " ++ showCtx g (EApp e1 e2))
-ti (Context g) (EAbs k e) =
-  do let n = Map.size g
-         indices = map negate [n..n+k-1]
-     tvs <- mapM (const newTypeVar) indices
-     let g' = Context (foldr (\(idx,tv) -> Map.insert idx (Scheme [] tv)) g (zip indices tvs))
+ti g (EAbs k e) =
+  do (g', tvs) <- ctxInsert k g
      (s1, t1) <- ti g' e
      return (s1, foldr ((:->) . apply s1) t1 tvs)
   `catchError`
-  (\err -> throwError $ err ++ "\n  in " ++ showCtx (Context g) (EAbs k e))
+  (\err -> throwError $ err ++ "\n  in " ++ showCtx g (EAbs k e))
 
 -- This simple test function tries to infer the type for the given
 -- expression. If successful, it prints the expression together with its
