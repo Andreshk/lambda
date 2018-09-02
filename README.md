@@ -1,2 +1,110 @@
-# lambda
-Lambda calculus &amp; proof theory
+# Lambda calculus &amp; proof theory
+
+A proof-of-concept implementation of the most fundamental concepts of lambda calculus:
+- lambda terms (compressed representation)
+- nameless lambda terms with DeBruijn indexing (also compressed)
+- converting between named & nameless lambda terms
+- lambda term parser
+- beta-reduction
+- type inference (Algorithm W) (!)
+
+## Example usage:
+```Haskell
+> :load lcpt.hs
+```
+The LCPT module serves as to unify the exported functionality of the other modules.
+It is recommended to import LCPT, rather than any of the others.
+
+### Parsing lambda terms
+The parsing function returns an optional compressed named lambda term.
+```Haskell
+> :t ps
+ps :: String -> Maybe NLambda
+> let (Just t) = ps "lambda[x,y,z]xz(yz)"
+> t
+NL ["x","y","z"] (NAp [NVar "x",NVar "z",NAp [NVar "y",NVar "z"]])
+```
+These lambda terms are used mainly as a conversion from user input to nameless lambda terms.
+
+The parsed format resembles closely the format used by humans - variables can only be named one of `x,y,z,u,v,w` (perhaps followed by a number), abstraction can bind multiple variables (`"lambda[x,y].."` can be used instead of `"lambda[x]lambda[y]"`) and application of terms is done by simply concatenating them, without any other syntactic constructs. Of course, brackets can be placed at will and will be taken into account.
+
+### Conversion to nameless lambda terms
+```Haskell
+> :t bemolle
+bemolle :: NLambda -> Lambda
+> let t1 = bemolle t
+> t1
+λ[u,v,w]uw(vw)
+```
+The nameless lambda terms are _compressed_, meaning:
+- repeated abstraction `lambda[x]lambda[y]..` is internally represented as `L 2 ..` - meaning two variables are bound
+- function application on a term on multiple arguments is represented as a list of terms, constructed with the `Ap` constructor. The tail of this list are the arguments, applied to the head, f.e. `Ap [s,k,k]` is equivalent to `((s k) k)`
+- standard DeBruijn indexing is used, meaning alpha-equivalence comes free as pure syntactic equivalence
+
+### Beta reduction
+```Haskell
+> :t beta
+beta :: Lambda -> Lambda
+> let t2 = Ap [s,k,k]
+> beta t2
+λ[u]u
+> i == beta t2
+True
+> w == beta w
+True
+```
+Some standard combinators are exposed for convenience:
+- the identity function I = `λ[u]u` (exported as `i`)
+- the constant functions K = `λ[u,v]u` and K* = `λ[u,v]v` (`k` and `ks`)
+- the substitution operator S = `λ[u,v,w]uw(vw)` (`s`)
+- the irreducible terms ω = `λ[u]uu` and Ω = ωω = `(λ[u]uu)(λ[u]uu)` (exported as `w` and `om`)
+- the fixed-point combinator Y = `λ[u](λ[v]u(vv))(λ[v]u(vv))` (`y`)
+- Chris Barker's iota combinator J (`j`) = `L 1 (Ap [Var 0, s, k])`:
+```Haskell
+> i == beta (Ap [j,j])
+True
+> ks == beta (Ap [j, Ap[j,j]])
+True
+> k == beta (Ap [j, Ap [j, Ap [j,j]]])
+True
+> s == beta (Ap [j, Ap [j, Ap [j, Ap [j,j]]]])
+True
+```
+### Beta reduction in details
+- the function `betaStep` performs one step of beta-reduction, if possible
+- `beta` performs a full reduction, but for ease-of-use acts as the identity on irreducibles
+- `betaSteps` gives a list of all intermediate steps
+- `betaSteps_` prints all intermediate steps
+
+### Type inference
+An implementation of the classic Algorithm W for type inference, adapted for compressed nameless lambda terms from [this repo](https://github.com/wh5a/Algorithm-W-Step-By-Step).
+
+As expected, beta reduction preserves the type (isomorphic up to type variable naming). Upon failure, a detailed error message is printed:
+```Haskell
+> infer i
+λ[u]u :: a -> a
+
+> infer s
+λ[u,v,w]uw(vw) :: (c -> c1 -> a1) -> (c -> c1) -> c -> a1
+
+> let t = Ap [s,k,k]
+> infer t
+(λ[u,v,w]uw(vw))(λ[u,v]u)(λ[u,v]u) :: b3 -> b3
+
+> mapM_ infer (betaSteps t)
+(λ[u,v,w]uw(vw))(λ[u,v]u)(λ[u,v]u) :: b3 -> b3
+
+(λ[u,v](λ[w,x]w)v(uv))(λ[u,v]u) :: c2 -> c2
+
+λ[u](λ[v,w]v)u((λ[v,w]v)u) :: b -> b
+
+λ[u](λ[v]u)((λ[v,w]v)u) :: b -> b
+
+λ[u]u :: a -> a
+
+> infer w
+λ[u]uu
+  occurs check fails: a vs. a -> b
+  in uu
+  in λ[u]uu
+```
