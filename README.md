@@ -37,8 +37,8 @@ bemolle :: NLambda -> Lambda
 λ[u,v,w]uw(vw)
 ```
 The nameless lambda terms are _compressed_, meaning:
-- repeated abstraction `lambda[x]lambda[y]..` is internally represented as `L 2 ..` - meaning two variables are bound
-- function application on a term on multiple arguments is represented as a list of terms, constructed with the `Ap` constructor. The tail of this list are the arguments, applied to the head, f.e. `Ap [s,k,k]` is equivalent to `((s k) k)`
+- repeated abstraction `lambda[x]lambda[y]..` is internally represented as one node in the tree, with the number of successively bound variables
+- function application on a term on multiple arguments is also represented as one node, containing a list of terms (constructed with the `Ap` constructor). The tail of this list are the arguments, applied to the head, f.e. `Ap [s,k,k]` is equivalent to `((s k) k)`
 - standard DeBruijn indexing is used, meaning alpha-equivalence comes free as pure syntactic equivalence
 
 ### Beta reduction
