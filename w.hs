@@ -14,7 +14,8 @@ import qualified Data.IntSet      as Set -- used for representing sets of type v
 import Control.Monad.Except (ExceptT, runExceptT, throwError, catchError)
 import Control.Monad.State (State, runStateT, put, get)
 import Control.Monad.Identity (runIdentity)
-import Data.List (intercalate)
+import Data.Maybe (fromJust)
+import Data.List (intercalate, (\\), elemIndex)
 import Lambda (Lambda(..), name, showCtx) -- the compressed lambda terms
 
 infixr :->
@@ -179,7 +180,7 @@ ti g (L k t) _ =
 -- type, otherwise, it prints the error message. The helper function
 -- calls ti and applies the returned substitution to the returned type.
 infer :: Lambda -> Either String Type
-infer t = fst . runTI $ uncurry apply <$> ti nullCtx t True
+infer t = minimize <$> (fst . runTI $ uncurry apply <$> ti nullCtx t True)
 
 infer_ :: Lambda -> IO ()
 infer_ t = case infer t of Left err -> putStrLn $ show t ++ "\n" ++ err ++ "\n"
@@ -199,6 +200,16 @@ e7 = L 2 (Ap [Var 0, Ap [Var 1, Ap [Var 1, Var 0]]])
 -- Main Program
 testInfer :: IO ()
 testInfer = mapM_ infer_ [e0, e1, e2, e3, e4, e5, e6, e7]
+
+-- "Minimize" the type variable numbers, in order
+-- to print "a -> a" instead of "c1 -> c1".
+minimize :: Type -> Type
+minimize t = min' (listVars t) t
+  where listVars (T i) = [i]
+        listVars (t1 :-> t2) = let lt1 = listVars t1
+                               in lt1 ++ ((listVars t2) \\ lt1)
+        min' vars (T i) = T (fromJust $ elemIndex i vars)
+        min' vars (t1 :-> t2) = (min' vars t1) :-> (min' vars t2)
 
 -- Pretty-printing
 showCtx' :: Context -> Lambda -> String
