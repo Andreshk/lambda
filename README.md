@@ -79,7 +79,7 @@ True
 ### Type inference
 An implementation of the classic Algorithm W for type inference, adapted for compressed nameless lambda terms from [this repo](https://github.com/wh5a/Algorithm-W-Step-By-Step).
 
-As expected, beta reduction preserves the type (isomorphic up to type variable naming). The function `infer` does the heavy lifting, whereas `infer_` pretty-prints the result. Upon failure, a detailed error message is printed.
+As expected, beta reduction preserves the type. The function `infer` does the heavy lifting, whereas `infer_` simply pretty-prints the result. Upon failure, a detailed error message is printed.
 ```Haskell
 > :t infer
 infer :: Lambda -> Either String Type
@@ -89,20 +89,20 @@ infer_ :: Lambda -> IO ()
 λ[u]u :: a -> a
 
 > infer_ s
-λ[u,v,w]uw(vw) :: (c -> c1 -> a1) -> (c -> c1) -> c -> a1
+λ[u,v,w]uw(vw) :: (a -> b -> c) -> (a -> b) -> a -> c
 
 > let t = Ap [s,k,k]
 > infer_ t
-(λ[u,v,w]uw(vw))(λ[u,v]u)(λ[u,v]u) :: b3 -> b3
+(λ[u,v,w]uw(vw))(λ[u,v]u)(λ[u,v]u) :: a -> a
 
 > mapM_ infer_ (betaSteps t)
-(λ[u,v,w]uw(vw))(λ[u,v]u)(λ[u,v]u) :: b3 -> b3
+(λ[u,v,w]uw(vw))(λ[u,v]u)(λ[u,v]u) :: a -> a
 
-(λ[u,v](λ[w,x]w)v(uv))(λ[u,v]u) :: c2 -> c2
+(λ[u,v](λ[w,x]w)v(uv))(λ[u,v]u) :: a -> a
 
-λ[u](λ[v,w]v)u((λ[v,w]v)u) :: b -> b
+λ[u](λ[v,w]v)u((λ[v,w]v)u) :: a -> a
 
-λ[u](λ[v]u)((λ[v,w]v)u) :: b -> b
+λ[u](λ[v]u)((λ[v,w]v)u) :: a -> a
 
 λ[u]u :: a -> a
 
