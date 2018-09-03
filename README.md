@@ -79,19 +79,23 @@ True
 ### Type inference
 An implementation of the classic Algorithm W for type inference, adapted for compressed nameless lambda terms from [this repo](https://github.com/wh5a/Algorithm-W-Step-By-Step).
 
-As expected, beta reduction preserves the type (isomorphic up to type variable naming). Upon failure, a detailed error message is printed:
+As expected, beta reduction preserves the type (isomorphic up to type variable naming). The function `infer` does the heavy lifting, whereas `infer_` pretty-prints the result. Upon failure, a detailed error message is printed.
 ```Haskell
-> infer i
+> :t infer
+infer :: Lambda -> Either String Type
+> :t infer_
+infer_ :: Lambda -> IO ()
+> infer_ i
 λ[u]u :: a -> a
 
-> infer s
+> infer_ s
 λ[u,v,w]uw(vw) :: (c -> c1 -> a1) -> (c -> c1) -> c -> a1
 
 > let t = Ap [s,k,k]
-> infer t
+> infer_ t
 (λ[u,v,w]uw(vw))(λ[u,v]u)(λ[u,v]u) :: b3 -> b3
 
-> mapM_ infer (betaSteps t)
+> mapM_ infer_ (betaSteps t)
 (λ[u,v,w]uw(vw))(λ[u,v]u)(λ[u,v]u) :: b3 -> b3
 
 (λ[u,v](λ[w,x]w)v(uv))(λ[u,v]u) :: c2 -> c2
@@ -102,7 +106,7 @@ As expected, beta reduction preserves the type (isomorphic up to type variable n
 
 λ[u]u :: a -> a
 
-> infer w
+> infer_ w
 λ[u]uu
   occurs check fails: a vs. a -> b
   in uu
