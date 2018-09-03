@@ -1,4 +1,4 @@
-module W (Type(..), order, infer, testInfer) where
+module W (Type(..), order, infer, infer_, testInfer) where
 -- Algorithm W Step by Step
 -- Original implementation: Martin Grabmueller
 --   (https://github.com/wh5a/Algorithm-W-Step-By-Step)
@@ -12,7 +12,8 @@ module W (Type(..), order, infer, testInfer) where
 import qualified Data.IntMap.Lazy as Map -- used for representing contexts (also sometimes called environments)
 import qualified Data.IntSet      as Set -- used for representing sets of type variables, etc.
 import Control.Monad.Except (ExceptT, runExceptT, throwError, catchError)
-import Control.Monad.State (StateT, runStateT, put, get)
+import Control.Monad.State (State, runStateT, put, get)
+import Control.Monad.Identity (runIdentity)
 import Data.List (intercalate)
 import Lambda (Lambda(..), name, showCtx) -- the compressed lambda terms
 
@@ -102,10 +103,10 @@ instance Types Context where
 -- of errors during type inference of a term.
 newtype TIState = TIState Int
 
-type TI a = ExceptT String (StateT TIState IO) a
+type TI a = ExceptT String (State TIState) a
 
-runTI :: TI a -> IO (Either String a, TIState)
-runTI t = runStateT (runExceptT t) (TIState 0) >>= return
+runTI :: TI a -> (Either String a, TIState)
+runTI t = runIdentity $ runStateT (runExceptT t) (TIState 0)
 
 newTypeVar :: TI Type
 newTypeVar =
@@ -177,10 +178,12 @@ ti g (L k t) _ =
 -- expression. If successful, it prints the expression together with its
 -- type, otherwise, it prints the error message. The helper function
 -- calls ti and applies the returned substitution to the returned type.
-infer :: Lambda -> IO ()
-infer t = printRes =<< (runTI $ (return . uncurry apply) =<< ti nullCtx t True)
-  where printRes (Left err, _) = putStrLn $ show t ++ "\n" ++ err ++ "\n"
-        printRes (Right ty, _) = putStrLn $ show t ++ " :: " ++ show ty ++ "\n"
+infer :: Lambda -> Either String Type
+infer t = fst . runTI $ uncurry apply <$> ti nullCtx t True
+
+infer_ :: Lambda -> IO ()
+infer_ t = case infer t of Left err -> putStrLn $ show t ++ "\n" ++ err ++ "\n"
+                           Right ty -> putStrLn $ show t ++ " :: " ++ show ty ++ "\n"
 
 -- Tests
 e0, e1, e2, e3, e4, e5, e6 :: Lambda
@@ -195,7 +198,7 @@ e7 = L 2 (Ap [Var 0, Ap [Var 1, Ap [Var 1, Var 0]]])
 
 -- Main Program
 testInfer :: IO ()
-testInfer = mapM_ infer [e0, e1, e2, e3, e4, e5, e6, e7]
+testInfer = mapM_ infer_ [e0, e1, e2, e3, e4, e5, e6, e7]
 
 -- Pretty-printing
 showCtx' :: Context -> Lambda -> String
