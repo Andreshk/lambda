@@ -95,7 +95,7 @@ reduceLeftMost (t:ts) = case betaStep t of Just t' -> Just (t':ts)
 -- Normal reduction strategy, corresponding to lazy evaluation.
 betaStep :: Lambda -> Maybe Lambda
 betaStep (Ap ((L k m):n:ns)) = Just (sanitize $ Ap (result:ns))
-  where result = down $ subst 0 n (sanitize $ L (k-1) m)
+  where result = down $ subst 0 (up 1 n) (sanitize $ L (k-1) m)
 betaStep (Ap ts) = Ap <$> reduceLeftMost ts
 betaStep (L k t) = L k <$> betaStep t
 betaStep t       = Nothing -- nothing to reduce, t is a variable
