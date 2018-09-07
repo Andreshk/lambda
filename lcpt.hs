@@ -2,6 +2,7 @@ module LCPT where
 import Lambda(Lambda(..), pretty, i, k, ks, s, w, om, y, j,
               valid, beta, betaStep, betaSteps, betaSteps_)
 import NLambda
+import Numerals
 import W
 
 main = putStrLn $
