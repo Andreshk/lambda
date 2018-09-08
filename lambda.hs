@@ -82,7 +82,9 @@ l2 = L 1 (Ap [Var 0, Var 1])                          -- λ[u]uv
 -- Reductions may simplify the more complex terms
 sanitize :: Lambda -> Lambda
 sanitize (Ap [t]) = t -- un-apply, if 0 arguments
+sanitize (Ap (Ap ts:ts')) = Ap (ts++ts')
 sanitize (L 0 t) = t  -- un-lambda, if no variables bound
+sanitize (L k (L m t)) = L (k+m) t
 sanitize t = t
 
 -- Traverse the list in depth, looking to reduce only the
@@ -96,8 +98,8 @@ reduceLeftMost (t:ts) = case betaStep t of Just t' -> Just (t':ts)
 betaStep :: Lambda -> Maybe Lambda
 betaStep (Ap ((L k m):n:ns)) = Just (sanitize $ Ap (result:ns))
   where result = down $ subst 0 (up 1 n) (sanitize $ L (k-1) m)
-betaStep (Ap ts) = Ap <$> reduceLeftMost ts
-betaStep (L k t) = L k <$> betaStep t
+betaStep (Ap ts) = sanitize . Ap <$> reduceLeftMost ts
+betaStep (L k t) = sanitize . L k <$> betaStep t
 betaStep t       = Nothing -- nothing to reduce, t is a variable
 
 -- Reduction to beta-normal form, if such exists
