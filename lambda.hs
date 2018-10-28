@@ -80,8 +80,8 @@ down = arrow (-1) 1 -- reduce all free variables by 1, knowing their indices hav
 -- Nameless lambda substitution
 subst :: Int -> Lambda -> Lambda -> Lambda
 subst i n (Var j) = if i == j then n else (Var j)
-subst i n (Ap ts) = Ap $ map (subst i n) ts
-subst i n (L k t) = L k $ (subst (i+k) (up k n) t)
+subst i n (Ap ts) = mkAp $ map (subst i n) ts
+subst i n (L k t) = mkL k $ (subst (i+k) (up k n) t)
 
 -- Substitution examples:
 l1, l2 :: Lambda
@@ -98,8 +98,9 @@ reduceLeftMost (t:ts) = case betaStep t of Just t' -> Just (t':ts)
 
 -- Normal reduction strategy, corresponding to lazy evaluation.
 betaStep :: Lambda -> Maybe Lambda
-betaStep (Ap ((L k m):n:ns)) = Just (mkAp (result:ns))
-  where result = down $ subst 0 (up 1 n) (mkL (k-1) m)
+betaStep (Ap ((L k m):n:ns)) = Just result
+  where subst' = down $ subst 0 (up 1 n) (mkL (k-1) m)
+        result = if null ns then subst' else mkAp (subst':ns)
 betaStep (Ap ts) = mkAp <$> reduceLeftMost ts
 betaStep (L k t) = mkL k <$> betaStep t
 betaStep t       = Nothing -- nothing to reduce, t is a variable
