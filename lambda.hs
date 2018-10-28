@@ -7,6 +7,16 @@ data Lambda = Var Int
             | L Int Lambda -- repeated abstraction: λ[u,v,w]... instead of λ[u]λ[v]λ[w]...
   deriving Eq -- alpha-equivalence is syntactic equivalence
 
+-- "Smart" constructors, enforcing the internal lambda term structure invariants
+-- It is _highly_ recommended to use these in all cases, except when entering a
+-- lambda term "literal", such as the example combinators below.
+mkAp :: [Lambda] -> Lambda
+mkAp ((Ap ts):ts') = Ap (ts++ts')
+mkAp ts = Ap ts
+mkL :: Int -> Lambda -> Lambda
+mkL 0 t = t
+mkL k t = L k t
+
 -- Generate a human-friendly variable name from an integer: u,v,w,x,y,z,u1,v1,w1,...
 name :: Int -> String
 name n = ("uvwxyz"!!(rem n 6)) : (if n < 6 then "" else (show (div n 6)))
@@ -79,14 +89,6 @@ l1 = L 1 (Ap [Var 0, L 1 (Ap [Var 1, Var 0, Var 3])]) -- λ[x]x(λ[y]xyz)
 l2 = L 1 (Ap [Var 0, Var 1])                          -- λ[u]uv
 -- subst 1 l2 l1 -> λ[x]x(λ[y]xy(λ[u]uv)) or something alpha-equivalent to it :)
 
--- Reductions may simplify the more complex terms
-sanitize :: Lambda -> Lambda
-sanitize (Ap [t]) = t -- un-apply, if 0 arguments
-sanitize (Ap (Ap ts:ts')) = Ap (ts++ts')
-sanitize (L 0 t) = t  -- un-lambda, if no variables bound
-sanitize (L k (L m t)) = L (k+m) t
-sanitize t = t
-
 -- Traverse the list in depth, looking to reduce only the
 -- left-most regex, and return Nothing if no regex is found.
 reduceLeftMost :: [Lambda] -> Maybe [Lambda]
@@ -96,10 +98,10 @@ reduceLeftMost (t:ts) = case betaStep t of Just t' -> Just (t':ts)
 
 -- Normal reduction strategy, corresponding to lazy evaluation.
 betaStep :: Lambda -> Maybe Lambda
-betaStep (Ap ((L k m):n:ns)) = Just (sanitize $ Ap (result:ns))
-  where result = down $ subst 0 (up 1 n) (sanitize $ L (k-1) m)
-betaStep (Ap ts) = sanitize . Ap <$> reduceLeftMost ts
-betaStep (L k t) = sanitize . L k <$> betaStep t
+betaStep (Ap ((L k m):n:ns)) = Just (mkAp (result:ns))
+  where result = down $ subst 0 (up 1 n) (mkL (k-1) m)
+betaStep (Ap ts) = mkAp <$> reduceLeftMost ts
+betaStep (L k t) = mkL k <$> betaStep t
 betaStep t       = Nothing -- nothing to reduce, t is a variable
 
 -- Reduction to beta-normal form, if such exists
@@ -111,6 +113,7 @@ beta t = case betaStep t of Nothing -> t
 -- Check for lambda term structure correctness
 valid :: Lambda -> Bool
 valid (Var i) = i >= 0
+valid (Ap (Ap _:_)) = False
 valid (Ap ts) = not (null ts) && not (null $ tail ts) && all valid ts
 valid (L _ (L _ _)) = False
 valid (L k t) = k > 0 && valid t
