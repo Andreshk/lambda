@@ -1,5 +1,5 @@
 module Numerals where
-import Lambda (Lambda(..), _Ap, _L, beta, k, ks)
+import Lambda (Lambda(..), beta, k, ks)
 import qualified Lambda as D (pretty, valid, betaSteps_) -- for debugging purposes
 
 c :: Int -> Lambda
@@ -40,19 +40,30 @@ toBool t
   | otherwise = Nothing
   where t' = beta t
 
-cNot :: Lambda -> Lambda
-cNot p = _Ap [p, cFalse, cTrue]
+cNot, cOr, cAnd :: Lambda
+cNot = L 1 (Ap [Var 0, cFalse, cTrue])
+cOr  = L 2 (Ap [Var 1, cTrue, Var 0])
+cAnd = L 2 (Ap [Var 1, Var 0, cFalse])
 
-cOr, cAnd :: Lambda -> Lambda -> Lambda
-cOr p q = _Ap [p, cTrue, q]
-cAnd p q = _Ap [p, q, cFalse]
+cNot' :: Lambda -> Lambda
+cNot' p = Ap [cNot,p]
+cOr', cAnd' :: Lambda -> Lambda -> Lambda
+cOr'  p q = Ap [cOr ,p,q]
+cAnd' p q = Ap [cAnd,p,q]
 
-cz :: Lambda -> Lambda
-cz n = _Ap [n, Ap [cTrue, cFalse], cTrue]
+cz :: Lambda
+cz = L 1 (Ap [Var 0, Ap [cTrue, cFalse], cTrue])
+
+cz' :: Lambda -> Lambda
+cz' n = Ap [cz,n]
 
 tests :: Bool
 tests = and [ toInt (cs' (c 2)) == Just 3
             , toInt (cPlus' (c 2) (c 3)) == Just 5
             , toInt (cMult' (c 2) (c 3)) == Just 6
-            , toInt (cPow' (c 2) (c 3)) == Just 8
+            , toInt (cPow'  (c 2) (c 3)) == Just 8
+            , toBool (cNot' cFalse) == Just True
+            , toBool (cNot' cTrue)  == Just False
+            , toBool (cOr'  cTrue cFalse) == Just True
+            , toBool (cAnd' cTrue cFalse) == Just False
             ]
