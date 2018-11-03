@@ -1,5 +1,6 @@
 module Numerals where
-import Lambda (Lambda(..), beta, k, ks)
+import Lambda (Lambda(..), _Ap, _L, beta, k, ks)
+import qualified Lambda as D (pretty, valid, betaSteps_) -- for debugging purposes
 
 c :: Int -> Lambda
 c n = L 2 (rep $ max n 0)
@@ -13,13 +14,20 @@ toInt t = case beta t of L 2 t' -> toInt' t'
         toInt' (Var 0)         = Just 0
         toInt' _               = Nothing
 
-cs :: Lambda -> Lambda
-cs n = L 2 (Ap [n, Var 1, Ap [Var 1, Var 0]])
+cs :: Lambda
+cs = L 3 (Ap [Var 2, Var 1, Ap [Var 1, Var 0]])
 
-cPlus, cMult, cPow :: Lambda -> Lambda -> Lambda
-cPlus n m = L 2 (Ap [n, Var 1, Ap [m, Var 1, Var 0]])
-cMult n m = L 2 (Ap [n, Ap [m, Var 1], Var 0])
-cPow n m = Ap [m, n]
+cPlus, cMult, cPow :: Lambda
+cPlus = L 4 (Ap [Var 3, Var 1, Ap [Var 2, Var 1, Var 0]])
+cMult = L 4 (Ap [Var 3, Ap [Var 2, Var 1], Var 0])
+cPow  = L 2 (Ap [Var 0, Var 1])
+
+cs' :: Lambda -> Lambda
+cs' n = Ap [cs,n]
+cPlus', cMult', cPow' :: Lambda -> Lambda -> Lambda
+cPlus' n m = Ap [cPlus,n,m]
+cMult' n m = Ap [cMult,n,m]
+cPow'  n m = Ap [cPow ,n,m]
 
 cTrue, cFalse :: Lambda
 cTrue  = k
@@ -33,11 +41,18 @@ toBool t
   where t' = beta t
 
 cNot :: Lambda -> Lambda
-cNot p = Ap [p, cFalse, cTrue]
+cNot p = _Ap [p, cFalse, cTrue]
 
 cOr, cAnd :: Lambda -> Lambda -> Lambda
-cOr p q = Ap [p, cTrue, q]
-cAnd p q = Ap [p, q, cFalse]
+cOr p q = _Ap [p, cTrue, q]
+cAnd p q = _Ap [p, q, cFalse]
 
 cz :: Lambda -> Lambda
-cz n = Ap [n, Ap [cTrue, cFalse], cTrue]
+cz n = _Ap [n, Ap [cTrue, cFalse], cTrue]
+
+tests :: Bool
+tests = and [ toInt (cs' (c 2)) == Just 3
+            , toInt (cPlus' (c 2) (c 3)) == Just 5
+            , toInt (cMult' (c 2) (c 3)) == Just 6
+            , toInt (cPow' (c 2) (c 3)) == Just 8
+            ]
