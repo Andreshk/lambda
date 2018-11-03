@@ -10,12 +10,13 @@ data Lambda = Var Int
 -- "Smart" constructors, enforcing the internal lambda term structure invariants
 -- It is _highly_ recommended to use these in all cases, except when entering a
 -- lambda term "literal", such as the example combinators below.
-mkAp :: [Lambda] -> Lambda
-mkAp ((Ap ts):ts') = Ap (ts++ts')
-mkAp ts = Ap ts
-mkL :: Int -> Lambda -> Lambda
-mkL 0 t = t
-mkL k t = L k t
+_Ap :: [Lambda] -> Lambda
+_Ap ((Ap ts):ts') = Ap (ts++ts')
+_Ap ts = Ap ts
+_L :: Int -> Lambda -> Lambda
+_L k (L m t) = L (k+m) t
+_L 0 t = t
+_L k t = L k t
 
 -- Generate a human-friendly variable name from an integer: u,v,w,x,y,z,u1,v1,w1,...
 name :: Int -> String
@@ -80,8 +81,8 @@ down = arrow (-1) 1 -- reduce all free variables by 1, knowing their indices hav
 -- Nameless lambda substitution
 subst :: Int -> Lambda -> Lambda -> Lambda
 subst i n (Var j) = if i == j then n else (Var j)
-subst i n (Ap ts) = mkAp $ map (subst i n) ts
-subst i n (L k t) = mkL k $ (subst (i+k) (up k n) t)
+subst i n (Ap ts) = _Ap $ map (subst i n) ts
+subst i n (L k t) = _L k $ (subst (i+k) (up k n) t)
 
 -- Substitution examples:
 l1, l2 :: Lambda
@@ -99,10 +100,10 @@ reduceLeftMost (t:ts) = case betaStep t of Just t' -> Just (t':ts)
 -- Normal reduction strategy, corresponding to lazy evaluation.
 betaStep :: Lambda -> Maybe Lambda
 betaStep (Ap ((L k m):n:ns)) = Just result
-  where subst' = down $ subst 0 (up 1 n) (mkL (k-1) m)
-        result = if null ns then subst' else mkAp (subst':ns)
-betaStep (Ap ts) = mkAp <$> reduceLeftMost ts
-betaStep (L k t) = mkL k <$> betaStep t
+  where subst' = down $ subst 0 (up 1 n) (_L (k-1) m)
+        result = if null ns then subst' else _Ap (subst':ns)
+betaStep (Ap ts) = _Ap <$> reduceLeftMost ts
+betaStep (L k t) = _L k <$> betaStep t
 betaStep t       = Nothing -- nothing to reduce, t is a variable
 
 -- Reduction to beta-normal form, if such exists
