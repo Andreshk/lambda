@@ -1,3 +1,4 @@
+{-# LANGUAGE FlexibleInstances #-}
 module Numerals where
 import Control.Applicative (liftA2)
 import Lambda (Lambda(..), beta, k, ks)
@@ -125,9 +126,19 @@ cLess = L 2 (Ap [cz, Ap [cMinus, Ap[cs, Var 1], Var 0]])
 cLess' :: Lambda -> Lambda -> Lambda
 cLess' n m = Ap [cLess,n,m]
 
+-- iei
+class Foo a where
+  foo :: Lambda -> Maybe a
+instance Foo Int       where foo = toInt
+instance Foo Bool      where foo = toBool
+instance Foo (Int,Int) where foo = toIntPair
+
+(=~=) :: (Foo a, Eq a) => Lambda -> a -> Bool
+x =~= y = foo x == Just y
+
 -- Simple unit tests
 tests :: Bool
-tests = and [ toInt (cs' (c 2)) == Just 3
+tests = and [ cs' (c 2) =~= (3 :: Int)
             , toInt (cPlus' (c 2) (c 3)) == Just 5
             , toInt (cMult' (c 2) (c 3)) == Just 6
             , toInt (cExpt' (c 2) (c 3)) == Just 8
@@ -145,6 +156,7 @@ tests = and [ toInt (cs' (c 2)) == Just 3
             , toInt (cPrev' (c 3)) == Just 2
             , toInt (cPrev' (c 0)) == Just 0
             , toInt (cMinus' (c 5) (c 3)) == Just 2
+            , toInt (cMinus' (c 2) (c 3)) == Just 0
             , toBool (cEqual' (c 2) (c 3)) == Just False
             , toBool (cEqual' (c 5) (c 5)) == Just True
             , toBool (cLess' (c 2) (c 3)) == Just True
