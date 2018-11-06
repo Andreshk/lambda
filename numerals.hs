@@ -126,6 +126,15 @@ cLess = L 2 (Ap [cz, Ap [cMinus, Ap[cs, Var 1], Var 0]])
 cLess' :: Lambda -> Lambda -> Lambda
 cLess' n m = Ap [cLess,n,m]
 
+-- Factorial!
+cFact :: Lambda
+cFact = L 1 (Ap [cTail, Ap [Var 0, nextPair, Ap [cCons,c 0,c 1]]])
+  where nextPair = L 1 (Ap [cCons, Ap [cs, Ap [cHead,Var 0]],
+                                   Ap [cMult, Ap [cs, Ap [cHead,Var 0]],
+                                              Ap [cTail,Var 0]]])
+cFact' :: Lambda -> Lambda
+cFact' n = Ap [cFact,n]
+
 -- Simple unit tests
 tests :: Bool
 tests = and [ cs' (c 2) =~= (c 3)
@@ -151,4 +160,6 @@ tests = and [ cs' (c 2) =~= (c 3)
             , cLess'  (c 2) (c 3) =~= cTrue
             , cLess'  (c 3) (c 3) =~= cFalse
             , cLess'  (c 5) (c 3) =~= cFalse
+            , cFact' (c 3) =~= (c 6)
+            , cFact' (c 4) =~= (c 24)
             ]
