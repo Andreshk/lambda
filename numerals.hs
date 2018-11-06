@@ -1,5 +1,4 @@
 {-# LANGUAGE FlexibleInstances #-}
-{-# LANGUAGE UndecidableInstances #-}
 module Numerals where
 import Control.Applicative (liftA2)
 import Lambda (Lambda(..), beta, (=~=), k, ks)
