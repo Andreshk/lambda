@@ -54,7 +54,7 @@ cNot = L 1 (Ap [Var 0, cFalse, cTrue])
 cOr  = L 2 (Ap [Var 1, cTrue, Var 0])
 cAnd = L 2 (Ap [Var 1, Var 0, cFalse])
 
--- More combinators as real-world-functions
+-- Boolean combinators as real-world-functions
 cNot' :: Lambda -> Lambda
 cNot' p = Ap [cNot,p]
 cOr', cAnd' :: Lambda -> Lambda -> Lambda
@@ -68,6 +68,28 @@ cz = L 1 (Ap [Var 0, Ap [cTrue, cFalse], cTrue])
 cz' :: Lambda -> Lambda
 cz' n = Ap [cz,n]
 
+-- Parity checks
+cEven, cOdd :: Lambda
+cEven = L 1 (Ap [Var 0, cNot, cTrue])
+cOdd  = L 1 (Ap [cNot, Ap [cEven, Var 0]])
+-- Parity checks as functions
+cEven', cOdd' :: Lambda -> Lambda
+cEven' n = Ap [cEven,n]
+cOdd'  n = Ap [cOdd ,n]
+
+-- Constructing a pair & accessing its two components
+cCons, cHead, cTail :: Lambda
+cCons = L 3 (Ap [Var 0, Var 2, Var 1])
+cHead = L 1 (Ap [Var 0, cTrue])
+cTail = L 1 (Ap [Var 0, cFalse])
+
+-- Pair operations as functions
+cCons' :: Lambda -> Lambda -> Lambda
+cCons' p q = Ap [cCons,p,q]
+cHead', cTail' :: Lambda -> Lambda
+cHead' p = Ap [cHead,p]
+cTail' p = Ap [cTail,p]
+
 -- Simple unit tests
 tests :: Bool
 tests = and [ toInt (cs' (c 2)) == Just 3
@@ -80,4 +102,8 @@ tests = and [ toInt (cs' (c 2)) == Just 3
             , toBool (cAnd' cTrue cFalse) == Just False
             , toBool (cz' (c 0)) == Just True
             , toBool (cz' (c 3)) == Just False
+            , toBool (cEven' (c 2)) == Just True
+            , toBool (cOdd' (c 4)) == Just False
+            , toInt (cHead' $ cCons' (c 2) (c 3)) == Just 2
+            , toInt (cTail' $ cCons' (c 2) (c 3)) == Just 3
             ]
