@@ -105,6 +105,26 @@ cPrev = L 1 (Ap [cTail, Ap [Var 0, nextPair, Ap [cCons,c 0,c 0]]])
 cPrev' :: Lambda -> Lambda
 cPrev' n = Ap [cPrev,n]
 
+-- Church numerals subtraction. Again, returns 0 instead of a negative result.
+cMinus :: Lambda
+cMinus = L 2 (Ap [Var 0, L 1 (Ap [cPrev, Var 0]), Var 1])
+cMinus' :: Lambda -> Lambda -> Lambda
+cMinus' n m = Ap [cMinus,n,m]
+
+-- Finally, an equality check
+cEqual :: Lambda
+cEqual = L 2 (Ap [cAnd, Ap [cz, Ap [cMinus, Var 0, Var 1]],
+                        Ap [cz, Ap [cMinus, Var 1, Var 0]]])
+cEqual' :: Lambda -> Lambda -> Lambda
+cEqual' n m = Ap [cEqual,n,m]
+
+-- If you have one comparison operator, you have them all.
+-- The remaining 5 are left as an exercise to the Reader.
+cLess :: Lambda
+cLess = L 2 (Ap [cz, Ap [cMinus, Ap[cs, Var 1], Var 0]])
+cLess' :: Lambda -> Lambda -> Lambda
+cLess' n m = Ap [cLess,n,m]
+
 -- Simple unit tests
 tests :: Bool
 tests = and [ toInt (cs' (c 2)) == Just 3
@@ -124,4 +144,10 @@ tests = and [ toInt (cs' (c 2)) == Just 3
             , toInt (cTail' $ cCons' (c 2) (c 3)) == Just 3
             , toInt (cPrev' (c 3)) == Just 2
             , toInt (cPrev' (c 0)) == Just 0
+            , toInt (cMinus' (c 5) (c 3)) == Just 2
+            , toBool (cEqual' (c 2) (c 3)) == Just False
+            , toBool (cEqual' (c 5) (c 5)) == Just True
+            , toBool (cLess' (c 2) (c 3)) == Just True
+            , toBool (cLess' (c 3) (c 3)) == Just False
+            , toBool (cLess' (c 5) (c 3)) == Just False
             ]
