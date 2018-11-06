@@ -1,4 +1,5 @@
 module Numerals where
+import Control.Applicative (liftA2)
 import Lambda (Lambda(..), beta, k, ks)
 import qualified Lambda as D (pretty, valid, betaSteps_) -- for debugging purposes
 
@@ -87,8 +88,14 @@ cTail = L 1 (Ap [Var 0, cFalse])
 cCons' :: Lambda -> Lambda -> Lambda
 cCons' p q = Ap [cCons,p,q]
 cHead', cTail' :: Lambda -> Lambda
-cHead' p = Ap [cHead,p]
-cTail' p = Ap [cTail,p]
+cHead' z = Ap [cHead,z]
+cTail' z = Ap [cTail,z]
+
+-- Extract a Haskell integer pair from a lambda
+-- term, representing a pair of integers.
+toIntPair :: Lambda -> Maybe (Int,Int)
+toIntPair z = case beta z of L 1 (Ap [Var 0,p,q]) -> liftA2 (,) (toInt p) (toInt q)
+                             _                    -> Nothing
 
 -- Simple unit tests
 tests :: Bool
@@ -104,6 +111,7 @@ tests = and [ toInt (cs' (c 2)) == Just 3
             , toBool (cz' (c 3)) == Just False
             , toBool (cEven' (c 2)) == Just True
             , toBool (cOdd' (c 4)) == Just False
+            , toIntPair (cCons' (c 2) (c 3)) == Just (2,3)
             , toInt (cHead' $ cCons' (c 2) (c 3)) == Just 2
             , toInt (cTail' $ cCons' (c 2) (c 3)) == Just 3
             ]
