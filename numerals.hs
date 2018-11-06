@@ -97,6 +97,14 @@ toIntPair :: Lambda -> Maybe (Int,Int)
 toIntPair z = case beta z of L 1 (Ap [Var 0,p,q]) -> liftA2 (,) (toInt p) (toInt q)
                              _                    -> Nothing
 
+-- Decreasing a positive integer by one (zero is left unchanged)
+cPrev :: Lambda
+cPrev = L 1 (Ap [cTail, Ap [Var 0, nextPair, Ap [cCons,c 0,c 0]]])
+  where nextPair = L 1 (Ap [cCons, Ap [cs, Ap[cHead, Var 0]],
+                                           Ap[cHead, Var 0]])
+cPrev' :: Lambda -> Lambda
+cPrev' n = Ap [cPrev,n]
+
 -- Simple unit tests
 tests :: Bool
 tests = and [ toInt (cs' (c 2)) == Just 3
@@ -114,4 +122,6 @@ tests = and [ toInt (cs' (c 2)) == Just 3
             , toIntPair (cCons' (c 2) (c 3)) == Just (2,3)
             , toInt (cHead' $ cCons' (c 2) (c 3)) == Just 2
             , toInt (cTail' $ cCons' (c 2) (c 3)) == Just 3
+            , toInt (cPrev' (c 3)) == Just 2
+            , toInt (cPrev' (c 0)) == Just 0
             ]
