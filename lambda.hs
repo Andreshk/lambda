@@ -112,6 +112,10 @@ beta :: Lambda -> Lambda
 beta t = case betaStep t of Nothing -> t
                             Just t' -> if t == t' then t else beta t'
 
+-- Beta-equivalence
+(=~=) :: Lambda -> Lambda -> Bool
+x =~= y = beta x == beta y
+
 -- Check for lambda term structure correctness
 valid :: Lambda -> Bool
 valid (Var i) = i >= 0

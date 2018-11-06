@@ -1,7 +1,8 @@
 {-# LANGUAGE FlexibleInstances #-}
+{-# LANGUAGE UndecidableInstances #-}
 module Numerals where
 import Control.Applicative (liftA2)
-import Lambda (Lambda(..), beta, k, ks)
+import Lambda (Lambda(..), beta, (=~=), k, ks)
 import qualified Lambda as D (pretty, valid, betaSteps_) -- for debugging purposes
 
 -- Make a Church numeral from an integer (negative numbers are zeroed)
@@ -126,40 +127,29 @@ cLess = L 2 (Ap [cz, Ap [cMinus, Ap[cs, Var 1], Var 0]])
 cLess' :: Lambda -> Lambda -> Lambda
 cLess' n m = Ap [cLess,n,m]
 
--- iei
-class Foo a where
-  foo :: Lambda -> Maybe a
-instance Foo Int       where foo = toInt
-instance Foo Bool      where foo = toBool
-instance Foo (Int,Int) where foo = toIntPair
-
-(=~=) :: (Foo a, Eq a) => Lambda -> a -> Bool
-x =~= y = foo x == Just y
-
 -- Simple unit tests
 tests :: Bool
-tests = and [ cs' (c 2) =~= (3 :: Int)
-            , toInt (cPlus' (c 2) (c 3)) == Just 5
-            , toInt (cMult' (c 2) (c 3)) == Just 6
-            , toInt (cExpt' (c 2) (c 3)) == Just 8
-            , toBool (cNot' cFalse) == Just True
-            , toBool (cNot' cTrue)  == Just False
-            , toBool (cOr'  cTrue cFalse) == Just True
-            , toBool (cAnd' cTrue cFalse) == Just False
-            , toBool (cz' (c 0)) == Just True
-            , toBool (cz' (c 3)) == Just False
-            , toBool (cEven' (c 2)) == Just True
-            , toBool (cOdd' (c 4)) == Just False
-            , toIntPair (cCons' (c 2) (c 3)) == Just (2,3)
-            , toInt (cHead' $ cCons' (c 2) (c 3)) == Just 2
-            , toInt (cTail' $ cCons' (c 2) (c 3)) == Just 3
-            , toInt (cPrev' (c 3)) == Just 2
-            , toInt (cPrev' (c 0)) == Just 0
-            , toInt (cMinus' (c 5) (c 3)) == Just 2
-            , toInt (cMinus' (c 2) (c 3)) == Just 0
-            , toBool (cEqual' (c 2) (c 3)) == Just False
-            , toBool (cEqual' (c 5) (c 5)) == Just True
-            , toBool (cLess' (c 2) (c 3)) == Just True
-            , toBool (cLess' (c 3) (c 3)) == Just False
-            , toBool (cLess' (c 5) (c 3)) == Just False
+tests = and [ cs' (c 2) =~= (c 3)
+            , cPlus' (c 2) (c 3) =~= (c 5)
+            , cMult' (c 2) (c 3) =~= (c 6)
+            , cExpt' (c 2) (c 3) =~= (c 8)
+            , cNot' cFalse =~= cTrue
+            , cNot' cTrue  =~= cFalse
+            , cOr'  cTrue cFalse =~= cTrue
+            , cAnd' cTrue cFalse =~= cFalse
+            , cz' (c 0) =~= cTrue
+            , cz' (c 3) =~= cFalse
+            , cEven' (c 2) =~= cTrue
+            , cOdd'  (c 4) =~= cFalse
+            , cHead' (cCons' (c 2) (c 3)) =~= (c 2)
+            , cTail' (cCons' (c 2) (c 3)) =~= (c 3)
+            , cPrev' (c 3) =~= (c 2)
+            , cPrev' (c 0) =~= (c 0)
+            , cMinus' (c 5) (c 3) =~= (c 2)
+            , cMinus' (c 2) (c 3) =~= (c 0)
+            , cEqual' (c 2) (c 3) =~= cFalse
+            , cEqual' (c 5) (c 5) =~= cTrue
+            , cLess'  (c 2) (c 3) =~= cTrue
+            , cLess'  (c 3) (c 3) =~= cFalse
+            , cLess'  (c 5) (c 3) =~= cFalse
             ]
