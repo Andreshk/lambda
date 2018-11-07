@@ -135,10 +135,11 @@ cFact = L 1 (Ap [cTail, Ap [Var 0, nextPair, Ap [cCons,c 0,c 1]]])
 cFact' :: Lambda -> Lambda
 cFact' n = Ap [cFact,n]
 
--- Integral division by 2
+-- Integral division by 2.
 cDiv2 :: Lambda
 cDiv2 = L 1 (Ap [cTail, Ap [Var 0, nextPair, Ap [cCons,c 0,c 0]]])
-  where nextPair = L 1 (Ap [letBody, Ap [cs, Ap [cHead,Var 0]], Ap [cTail,Var 0]])
+  where -- nextPair = \p -> let s = succ (fst p); q = snd p in letBody s q
+        nextPair = L 1 (Ap [letBody, Ap [cs, Ap [cHead,Var 0]], Ap [cTail,Var 0]])
         letBody  = L 2 (Ap [cCons, Var 1, Ap [cEven, Var 1, Ap [cs,Var 0], Var 0]])
 cDiv2' :: Lambda -> Lambda
 cDiv2' n = Ap [cDiv2,n]
