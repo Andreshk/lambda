@@ -135,6 +135,14 @@ cFact = L 1 (Ap [cTail, Ap [Var 0, nextPair, Ap [cCons,c 0,c 1]]])
 cFact' :: Lambda -> Lambda
 cFact' n = Ap [cFact,n]
 
+-- Integral division by 2
+cDiv2 :: Lambda
+cDiv2 = L 1 (Ap [cTail, Ap [Var 0, nextPair, Ap [cCons,c 0,c 0]]])
+  where nextPair = L 1 (Ap [letBody, Ap [cs, Ap [cHead,Var 0]], Ap [cTail,Var 0]])
+        letBody  = L 2 (Ap [cCons, Var 1, Ap [cEven, Var 1, Ap [cs,Var 0], Var 0]])
+cDiv2' :: Lambda -> Lambda
+cDiv2' n = Ap [cDiv2,n]
+
 -- Simple unit tests
 tests :: Bool
 tests = and [ cs' (c 2) =~= (c 3)
@@ -162,4 +170,7 @@ tests = and [ cs' (c 2) =~= (c 3)
             , cLess'  (c 5) (c 3) =~= cFalse
             , cFact' (c 3) =~= (c 6)
             , cFact' (c 4) =~= (c 24)
+            , cDiv2' (c 8) =~= (c 4)
+            , cDiv2' (c 7) =~= (c 3)
+            , cDiv2' (c 0) =~= (c 0)
             ]
