@@ -1,7 +1,6 @@
 module Numerals where
 import Control.Applicative (liftA2)
 import Lambda (Lambda(..), beta, (=~=), k, ks)
-import qualified Lambda as D (pretty, valid, betaSteps_) -- for debugging purposes
 
 -- Make a Church numeral from an integer (negative numbers are zeroed)
 c :: Int -> Lambda
@@ -125,7 +124,7 @@ cLess = L 2 (Ap [cz, Ap [cMinus, Ap[cs, Var 1], Var 0]])
 cLess' :: Lambda -> Lambda -> Lambda
 cLess' n m = Ap [cLess,n,m]
 
--- Factorial!
+-- Factorial! Becomes slow after n = 4, though...
 cFact :: Lambda
 cFact = L 1 (Ap [cTail, Ap [Var 0, nextPair, Ap [cCons,c 0,c 1]]])
   where -- next pair = \p -> let h = fst p; t = snd t in letBody h t
@@ -143,6 +142,18 @@ cDiv2 = L 1 (Ap [cTail, Ap [Var 0, nextPair, Ap [cCons,c 0,c 0]]])
         letBody  = L 2 (Ap [cCons, Var 1, Ap [cEven, Var 1, Ap [cs,Var 0], Var 0]])
 cDiv2' :: Lambda -> Lambda
 cDiv2' n = Ap [cDiv2,n]
+
+-- Square root (rounded down to the nearest integer)
+-- Takes a noticable time even for n = 4 or 5
+cSqrt :: Lambda
+cSqrt = L 1 (Ap [cPrev, Ap [cTail, Ap [Var 0, nextPair, Ap [cCons,Var 0,c 1]]]])
+  where -- this let-construction is basically pattern-matching a pair's components
+        nextPair = L 1 (Ap [letBody, Ap [cHead,Var 0], Ap [cTail,Var 0]])
+        letBody  = L 2 (Ap [cLess, Var 1, Ap [cMult,Var 0,Var 0],
+                            Ap [cCons, Var 1, Var 0],
+                            Ap [cCons, Var 1, Ap [cs,Var 0]]])
+cSqrt' :: Lambda -> Lambda
+cSqrt' n = Ap [cSqrt,n]
 
 -- Simple unit tests
 tests :: Bool
@@ -174,4 +185,7 @@ tests = and [ cs' (c 2) =~= (c 3)
             , cDiv2' (c 8) =~= (c 4)
             , cDiv2' (c 7) =~= (c 3)
             , cDiv2' (c 0) =~= (c 0)
+            , cSqrt' (c 0) =~= (c 0)
+            , cSqrt' (c 3) =~= (c 1)
+            , cSqrt' (c 4) =~= (c 2)
             ]
