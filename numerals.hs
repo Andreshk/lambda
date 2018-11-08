@@ -1,4 +1,3 @@
-{-# LANGUAGE FlexibleInstances #-}
 module Numerals where
 import Control.Applicative (liftA2)
 import Lambda (Lambda(..), beta, (=~=), k, ks)
@@ -129,13 +128,14 @@ cLess' n m = Ap [cLess,n,m]
 -- Factorial!
 cFact :: Lambda
 cFact = L 1 (Ap [cTail, Ap [Var 0, nextPair, Ap [cCons,c 0,c 1]]])
-  where nextPair = L 1 (Ap [cCons, Ap [cs, Ap [cHead,Var 0]],
-                                   Ap [cMult, Ap [cs, Ap [cHead,Var 0]],
-                                              Ap [cTail,Var 0]]])
+  where -- next pair = \p -> let h = fst p; t = snd t in letBody h t
+        nextPair = L 1 (Ap [letBody, Ap [cHead,Var 0], Ap [cTail,Var 0]])
+        letBody  = L 2 (Ap [cCons, Ap [cs, Var 1],
+                                   Ap [cMult, Ap [cs, Var 1], Var 0]])
 cFact' :: Lambda -> Lambda
 cFact' n = Ap [cFact,n]
 
--- Integral division by 2.
+-- Integral division by 2
 cDiv2 :: Lambda
 cDiv2 = L 1 (Ap [cTail, Ap [Var 0, nextPair, Ap [cCons,c 0,c 0]]])
   where -- nextPair = \p -> let s = succ (fst p); q = snd p in letBody s q
