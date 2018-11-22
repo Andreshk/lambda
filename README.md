@@ -1,12 +1,12 @@
 # Lambda calculus &amp; proof theory
 
 A proof-of-concept implementation of the most fundamental concepts of lambda calculus:
-- lambda terms (compressed representation)
-- nameless lambda terms with DeBruijn indexing (also compressed)
-- converting between named & nameless lambda terms
-- lambda term parser
+- nameless lambda terms with DeBruijn indexing (compressed representation)
+- lambda term parser (into intermediate named lambda terms, converted to nameless terms)
 - beta-reduction
 - type inference (Algorithm W) (!)
+- binary encoding/decoding
+- Church numerals, booleans & general practical uses
 
 ## Example usage:
 ```Haskell
@@ -16,26 +16,17 @@ The LCPT module serves as to unify the exported functionality of the other modul
 It is recommended to import LCPT, rather than any of the others.
 
 ### Parsing lambda terms
-The parsing function returns an optional compressed named lambda term.
+The parsing function returns an optional compressed nameless lambda term.
 ```Haskell
 > :t ps
-ps :: String -> Maybe NLambda
+ps :: String -> Maybe Lambda
 > let (Just t) = ps "lambda[x,y,z]xz(yz)"
 > t
-NL ["x","y","z"] (NAp [NVar "x",NVar "z",NAp [NVar "y",NVar "z"]])
+lambda[u,v,w]uw(vw)
 ```
-These lambda terms are used mainly as a conversion from user input to nameless lambda terms.
-
 The parsed format resembles closely the format used by humans - variables can only be named one of `x,y,z,u,v,w` (perhaps followed by a number), abstraction can bind multiple variables (`"lambda[x,y].."` can be used instead of `"lambda[x]lambda[y]"`) and application of terms is done by simply concatenating them, without any other syntactic constructs. Of course, brackets can be placed at will and will be taken into account.
 
-### Conversion to nameless lambda terms
-```Haskell
-> :t bemolle
-bemolle :: NLambda -> Lambda
-> let t1 = bemolle t
-> t1
-λ[u,v,w]uw(vw)
-```
+### Nameless lambda terms - implementation details
 The nameless lambda terms are _compressed_, meaning:
 - repeated abstraction `lambda[x]lambda[y]..` is internally represented as one node in the tree, with the number of successively bound variables
 - function application on a term on multiple arguments is also represented as one node, containing a list of terms (constructed with the `Ap` constructor). The tail of this list are the arguments, applied to the head, f.e. `Ap [s,k,k]` is equivalent to `((s k) k)`
@@ -112,3 +103,9 @@ infer_ :: Lambda -> IO ()
   in uu
   in λ[u]uu
 ```
+
+### Binary encoding/decoding
+\[WIP]
+
+### Church numerals, booleans & arithmetic
+\[WIP]
