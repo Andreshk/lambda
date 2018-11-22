@@ -1,5 +1,5 @@
 {-# LANGUAGE TupleSections #-}
-module NLambda (NLambda(..), ps, fv, bemolle) where
+module NLambda (ps) where
 import Control.Applicative ((<|>))
 import Data.Maybe (fromJust)
 import Data.List (elemIndex, sort, nub, (\\))
@@ -10,7 +10,7 @@ instance Show Name where show (Name n) = show n
 
 -- Named lambda term
 data NLambda = NVar Name         -- a variable with a name
-             | NAp [NLambda]       -- application of multiple terms
+             | NAp [NLambda]     -- application of multiple terms
              | NL [Name] NLambda -- repeated abstraction
   deriving Show -- temporary
 
@@ -84,10 +84,12 @@ psTerm str = do
         simplify ((NAp ts):ts') = NAp (ts++ts') -- compressed application of multiple terms
         simplify ts = NAp ts
 
--- Parse a string, consisting only of a single lambda term
-ps :: String -> Maybe NLambda
-ps str = (psTerm str >>= psEof)
-  where psEof (t, rest) = if null rest then Just t else Nothing
+-- Parse a string, consisting only of a single lambda term,
+-- and immediately convert to an unnamed lambda term.
+ps :: String -> Maybe Lambda
+ps str = do
+  (t, "") <- psTerm str
+  return (bemolle t)
 
 -- Free variables of a term, sorted for convenience.
 -- There may be a more efficient implementation.
