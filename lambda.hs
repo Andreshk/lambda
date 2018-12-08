@@ -1,6 +1,7 @@
 {-# LANGUAGE CPP #-} -- C preprocessor for OS detection with ifdef
 module Lambda where
 import Data.List (sort,nub,intercalate)
+import Data.Function (on)
 
 data Lambda = Var Int
             | Ap [Lambda]  -- application over many arguments: xyzw instead of (((xy)z)w)
@@ -114,7 +115,8 @@ beta t = case betaStep t of Nothing -> t
 
 -- Beta-equivalence
 (=~=) :: Lambda -> Lambda -> Bool
-x =~= y = beta x == beta y
+(=~=) = (==) `on` beta
+--x =~= y = beta x == beta y
 
 -- Check for lambda term structure correctness
 valid :: Lambda -> Bool
