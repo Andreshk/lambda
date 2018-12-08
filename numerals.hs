@@ -155,6 +155,16 @@ cSqrt = L 1 (Ap [cPrev, Ap [cTail, Ap [Var 0, nextPair, Ap [cCons,Var 0,c 1]]]])
 cSqrt' :: Lambda -> Lambda
 cSqrt' n = Ap [cSqrt,n]
 
+-- Integral modulo
+cMod :: Lambda
+cMod = L 2 (Ap [cHead, Ap [Var 0, nextPair, Ap [cCons, Var 1, Var 0]]])
+  where nextPair = L 1 (Ap [letBody, Ap [cHead, Var 0], Ap [cTail, Var 0]])
+        letBody  = L 2 (Ap [cLess, Var 1, Var 0,
+                            Ap [cCons, Var 1, Var 0],
+                            Ap [cCons, Ap [cMinus, Var 1, Var 0], Var 0]])
+cMod' :: Lambda -> Lambda -> Lambda
+cMod' m n = Ap [cMod,m,n]
+
 -- Simple unit tests
 tests :: Bool
 tests = and [ cs' (c 2) =~= (c 3)
@@ -188,4 +198,6 @@ tests = and [ cs' (c 2) =~= (c 3)
             , cSqrt' (c 0) =~= (c 0)
             , cSqrt' (c 3) =~= (c 1)
             , cSqrt' (c 4) =~= (c 2)
+            , cMod' (c 5) (c 2) =~= (c 1)
+            , cMod' (c 4) (c 2) =~= (c 0)
             ]
