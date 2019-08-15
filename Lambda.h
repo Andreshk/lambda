@@ -55,11 +55,11 @@ public:
 
 private:
 	// Perform one beta-reduction step using the normal reduction strategy
-	// (reduce the outermost, left-most redex). Returns true if no regex is found.
+	// (reduce the outermost, left-most redex). Returns true if no redex is found.
 	bool betaStep();
 public:
 	// Beta reduction. Currently does not recognize terms that reduce to themselves.
-	// Returns the number of steps needed (i.e. the number of reduced regexes).
+	// Returns the number of steps needed (i.e. the number of reduced redexes).
 	unsigned betaReduce();
 
 	// Check whether the term is properly compressed (see Ap::Ap() and L::L())

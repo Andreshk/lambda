@@ -177,12 +177,12 @@ bool Lambda::betaStep() {
 }
 
 unsigned Lambda::betaReduce() {
-	unsigned numRegexes = 0;
-	// Each beta-step reduces one regex.
+	unsigned numRedexes = 0;
+	// Each beta-step reduces one redex.
 	while (betaStep()) {
-		++numRegexes;
+		++numRedexes;
 	}
-	return numRegexes;
+	return numRedexes;
 }
 
 bool Lambda::isValid() const {
@@ -202,7 +202,8 @@ bool Lambda::isValid() const {
 			return true;
 		}
 		bool operator()(const L& l) {
-			return (l.k > 0 && !Lambda::get_if<L>(l.body.get()) && Lambda::visit(*this, *l.body));
+			const Lambda& body = *l.body;
+			return (l.k > 0 && !Lambda::get_if<L>(&body) && Lambda::visit(*this, body));
 		}
 	};
 	return Lambda::visit(ValidVisitor{}, *this);
