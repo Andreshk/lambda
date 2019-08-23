@@ -19,9 +19,9 @@ _L k (L m t) = L (k+m) t
 _L 0 t = t
 _L k t = L k t
 
--- Generate a human-friendly variable name from an integer: u,v,w,x,y,z,u1,v1,w1,...
+-- Generate a human-friendly variable name from a deBruijn index: u,v,w,x,y,z,u1,v1,w1,...
 -- The names for bound & free variables are generated slightly differently, otherwise
--- we'd need to keep an explicit stream of already generated names.
+-- we'd need to keep an explicit stream of the already generated names.
 boundName, freeName :: Int -> String
 boundName n = ("uvwxyz"!!(rem n 6)) : (if n < 6 then "" else (show (div n 6)))
 freeName n = let (c:num) = boundName n in (c:'0':num)
@@ -34,22 +34,21 @@ lambda = "lambda"
 lambda = "λ"
 #endif
 
--- We start with an empty context first, but simulate it later when creating a new
--- name for a free variable. Upon reaching a bound variable, we give it a new name
--- and push that name to the front of the context to preserve the deBruijn indices
--- of all variables. Invariant: n == length ctx.
+-- We keep an implicit context of names for both bound and free variables. In order
+-- to distinguish between the two classes, at each step we only keep the number of
+-- bound variables so far, and after determining whether a variable is bound or free,
+-- we generate procedurally a name, determined by its deBruijn index.
 instance Show Lambda where
-  show = showCtx [] 0
+  show = showCtx 0
 
 -- A function also used during type inference, not to be called directly
-showCtx :: [String] -> Int -> Lambda -> String
-showCtx ctx n (Var i) = (if i < n then ctx!!i else freeName $ i-n)
-showCtx ctx n (Ap ts) = concatMap (showBr ctx n) ts
-  where showBr ctx n t@(Var _) = showCtx ctx n t -- does the same as showCtx, except put braces around complex terms (non-variables)
-        showBr ctx n t = "(" ++ showCtx ctx n t ++ ")"
-showCtx ctx n (L k t) = lambda ++ "[" ++ (intercalate "," names) ++ "]" ++ showCtx ctx' (n+k) t
+showCtx :: Int -> Lambda -> String
+showCtx n (Var i) = (if i < n then boundName $ n-1-i else freeName $ i-n)
+showCtx n (Ap ts) = concatMap (showBr n) ts
+  where showBr n t@(Var _) = showCtx n t -- does the same as showCtx, except put braces around complex terms (non-variables)
+        showBr n t = "(" ++ showCtx n t ++ ")"
+showCtx n (L k t) = lambda ++ "[" ++ (intercalate "," names) ++ "]" ++ showCtx (n+k) t
   where names = map boundName [n..n+k-1]
-        ctx' = reverse names ++ ctx
 
 -- Pretty-print a term to make its structure more easily visible. To-do: DOT
 pretty :: Lambda -> IO () -- disclaimer: not actually pretty
