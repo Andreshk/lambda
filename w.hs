@@ -16,7 +16,7 @@ import Control.Monad.State (State, runStateT, put, get)
 import Control.Monad.Identity (runIdentity)
 import Data.Maybe (fromJust)
 import Data.List (intercalate, (\\), elemIndex)
-import Lambda (Lambda(..), name, showCtx) -- the compressed lambda terms
+import Lambda (Lambda(..), boundName, showCtx) -- the compressed lambda terms
 
 infixr :->
 data Type = T Int
@@ -156,7 +156,7 @@ varBind (T u) t
 ti :: Context -> Lambda -> Bool -> TI (Subst, Type)
 ti g (Var i) _ =
   case ctxLookup i g of
-    Nothing    -> throwError $ "  unbound variable: " ++ show (name i)
+    Nothing    -> throwError $ "  unbound variable: " ++ show (boundName i)
     Just sigma -> do t <- instantiate sigma
                      return (nullSubst, t)
 ti g (Ap [t]) _ = ti g t True
@@ -214,7 +214,7 @@ minimize t = min' (listVars t) t
 -- Pretty-printing
 showCtx' :: Context -> Lambda -> String
 showCtx' (Context g) = showCtx names n
-  where (names, n) = let n = Map.size g in (name <$> reverse [0..n-1], n)
+  where (names, n) = let n = Map.size g in (boundName <$> reverse [0..n-1], n)
 
 -- The -> operator is right-associative, so a->(b->c) is the same as
 -- a->b->c and is printed this way, whereas (a->b)->c is different

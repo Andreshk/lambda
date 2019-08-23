@@ -20,8 +20,11 @@ _L 0 t = t
 _L k t = L k t
 
 -- Generate a human-friendly variable name from an integer: u,v,w,x,y,z,u1,v1,w1,...
-name :: Int -> String
-name n = ("uvwxyz"!!(rem n 6)) : (if n < 6 then "" else (show (div n 6)))
+-- The names for bound & free variables are generated slightly differently, otherwise
+-- we'd need to keep an explicit stream of already generated names.
+boundName, freeName :: Int -> String
+boundName n = ("uvwxyz"!!(rem n 6)) : (if n < 6 then "" else (show (div n 6)))
+freeName n = let (c:num) = boundName n in (c:'0':num)
 
 -- Pretty-print a λ where supported - i.e. everywhere, except Windows
 lambda :: String
@@ -40,12 +43,12 @@ instance Show Lambda where
 
 -- A function also used during type inference, not to be called directly
 showCtx :: [String] -> Int -> Lambda -> String
-showCtx ctx n (Var i) = (if i < n then ctx!!i else name i)
+showCtx ctx n (Var i) = (if i < n then ctx!!i else freeName $ i-n)
 showCtx ctx n (Ap ts) = concatMap (showBr ctx n) ts
   where showBr ctx n t@(Var _) = showCtx ctx n t -- does the same as showCtx, except put braces around complex terms (non-variables)
         showBr ctx n t = "(" ++ showCtx ctx n t ++ ")"
 showCtx ctx n (L k t) = lambda ++ "[" ++ (intercalate "," names) ++ "]" ++ showCtx ctx' (n+k) t
-  where names = map name [n..n+k-1]
+  where names = map boundName [n..n+k-1]
         ctx' = reverse names ++ ctx
 
 -- Pretty-print a term to make its structure more easily visible. To-do: DOT
