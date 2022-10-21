@@ -1,6 +1,6 @@
 module Numerals where
 import Control.Applicative (liftA2)
-import Lambda (Lambda(..), beta, (=~=), k, ks)
+import Lambda (Lambda(..), beta, (=~=), k, ks, y)
 
 -- Make a Church numeral from an integer (negative numbers are zeroed)
 c :: Int -> Lambda
@@ -134,6 +134,14 @@ cFact = L 1 (Ap [cTail, Ap [Var 0, nextPair, Ap [cCons,c 0,c 1]]])
 cFact' :: Lambda -> Lambda
 cFact' n = Ap [cFact,n]
 
+-- Factorial via the Y-combinator - interestingly, even slower (!)
+cFact2 :: Lambda
+cFact2 = L 1 (Ap [y, gamma, Var 0])
+  where gamma = L 2 (Ap [cEqual, Var 0, c 0, c 1,
+                          Ap [cMult, Var 0, Ap [Var 1, Ap [cPrev, Var 0]]]])
+cFact2' :: Lambda -> Lambda
+cFact2' n = Ap [cFact2,n]
+
 -- Integral division by 2
 cDiv2 :: Lambda
 cDiv2 = L 1 (Ap [cTail, Ap [Var 0, nextPair, Ap [cCons,c 0,c 0]]])
@@ -200,6 +208,8 @@ tests = and [ cs' (c 2) =~= (c 3)
             , cLess'  (c 5) (c 3) =~= cFalse
             , cFact' (c 3) =~= (c 6)
             , cFact' (c 4) =~= (c 24)
+            , cFact2' (c 3) =~= (c 6)
+            , cFact2' (c 4) =~= (c 24)
             , cDiv2' (c 8) =~= (c 4)
             , cDiv2' (c 7) =~= (c 3)
             , cDiv2' (c 0) =~= (c 0)
