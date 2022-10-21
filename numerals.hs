@@ -181,6 +181,18 @@ cFib = L 1 (Ap [cHead, Ap [Var 0, nextPair, Ap [cCons, c 0, c 1]]])
 cFib' :: Lambda -> Lambda
 cFib' n = Ap [cFib,n]
 
+-- Ackermann function - not primitive recursive, so no way to avoid Y
+-- Does not seem to terminate even for (0,0) - is there a bug..?
+cAck :: Lambda
+cAck = L 2 (Ap [y, gamma, Ap [cCons, Var 1, Var 0]])
+  where gamma = L 1 (Ap [letBody, Ap [cHead, Var 0], Ap [cTail, Var 0]])
+        letBody = L 2 (Ap [cz, Var 1, Ap [cs, Var 0],
+                          Ap [cz, Var 0, Ap [Var 2, Ap [cCons, Ap [cPrev, Var 1], c 1],
+                              Ap [Var 2, Ap [cCons, Ap [cPrev, Var 1],
+                                                    Ap [Var 2, Ap [cCons, Var 1, Ap [cPrev, Var 0]]]]]]]])
+cAck' :: Lambda -> Lambda -> Lambda
+cAck' m n = Ap [cAck,m,n]
+
 -- Simple unit tests
 tests :: Bool
 tests = and [ cs' (c 2) =~= (c 3)
